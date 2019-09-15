@@ -70,7 +70,7 @@ func main() {
 		"rate":       rate,
 		"admin":      admin,
 		"admin-port": adminPort,
-	}).Infof("Config found")
+	}).Debugf("Config found")
 
 	var m metrics
 	m.init(admin, adminPort)
