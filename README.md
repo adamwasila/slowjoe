@@ -2,6 +2,8 @@
 
 Small TCP proxy to test your services for reconnection & timeout procedures.
 
+> **WARNING**: unstable product. API, configuration and behaviour may and will change without a warning.
+
 ## Install
 
 Go 1.12+ should be installed in the system. While it was not tested with earlier versions of go it should work as long as you provide all required dependencies.
