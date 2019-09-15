@@ -5,7 +5,6 @@ import (
 	"math/rand"
 	"net"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -24,28 +23,39 @@ func main() {
 
 	var bind, upstream string
 	var admin bool
+	var delay time.Duration
 	var rate, adminPort int
-	// var abortChance, delayInfChance,
-	var throttleChance float64
+	var closeChance, throttleChance float64
 	var verbose bool
 	var veryVerbose bool
 
 	pflag.StringVarP(&bind, "bind", "b", "127.0.0.1:9998", "Address to bind listening socket to")
 	pflag.StringVarP(&upstream, "upstream", "u", "127.0.0.1:8000", "<host>[:port] of upstream service")
 	pflag.IntVarP(&rate, "rate", "r", 0, "Maximum data rate of bytes per second if throttling applied (see --throttle-chance)")
+	pflag.DurationVarP(&delay, "delay", "d", 0, "Initial delay when connection starts to deteriorate")
 	pflag.BoolVarP(&admin, "admin", "a", false, "Enable admin console service")
 	pflag.IntVarP(&adminPort, "admin-port", "p", 6000, "Port for admin console service")
 	pflag.BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output (debug logs)")
 	pflag.BoolVarP(&veryVerbose, "very-verbose", "w", false, "Enable very verbose output (trace logs)")
 
-	// pflag.Float64VarP(&abortChance, "abort-chance", "a", 0.0, "")
-	// pflag.Float64VarP(&delayInfChance, "delay-chance", "d", 0.0, "")
+	pflag.Float64VarP(&closeChance, "close-chance", "c", 0.0, "Probability of closing socket abruptly")
 	pflag.Float64VarP(&throttleChance, "throttle-chance", "t", 0.0, "Probability of throttling")
 
-	// delayInfChance += abortChance
-	// throttleChance += delayInfChance
-
 	pflag.Parse()
+
+	throttleChance += closeChance
+
+	if throttleChance < 0.0 || closeChance < 0.0 {
+		logrus.Fatal("Invalid config; chances must be >= 0")
+	}
+
+	if throttleChance > 1.0 || closeChance > 1.0 {
+		logrus.Fatal("Invalid config; sum of all chances must be <= 1.0")
+	}
+
+	if rate < 0 {
+		logrus.Fatal("Invalid config; rate must be >= 0")
+	}
 
 	if verbose {
 		logrus.SetLevel(logrus.DebugLevel)
@@ -94,84 +104,88 @@ func main() {
 
 		chance := rand.Float64()
 
-		// abort := chance < abortChance
-		// delayInf := chance < delayInfChance
-		throttle := chance < throttleChance
+		close := chance < closeChance
+		throttle := chance >= closeChance && chance < throttleChance
 
 		name := nameGenerator.Generate()
-		if throttle {
-			name = strings.ToUpper(name)
-		}
 
-		logrus.WithField("name", name).Infof("Incoming connection")
+		logrus.WithField("alias", name).Infof("Incoming connection")
 
 		ups, err := net.DialTCP("tcp", nil, upstreamAddr)
 		if err != nil {
-			logrus.Errorf("Could not connect to upstream: [%s]", err)
+			logrus.WithError(err).Errorf("Could not connect to upstream")
 			err := conn.Close()
 			if err != nil {
-				logrus.Warnf("Error while closing source connection: %s", err)
+				logrus.WithError(err).Warnf("Error closing source connection")
 			}
 			continue
 		}
-
-		// if abort {
-		// 	err := conn.Close()
-		// 	if err != nil {
-		// 		logrus.Warnf("Error while closing source connection: %s", err)
-		// 	}
-		// 	err = ups.Close()
-		// 	if err != nil {
-		// 		logrus.Warnf("Error while closing upstream connection: %s", err)
-		// 	}
-		// 	continue
-		// }
 
 		m.activeConnectionAdd()
 
 		once := sync.Once{}
 		connectionCloser := func() {
 			once.Do(func() {
-				log := logrus.WithField("name", name)
-				log.Warnf("Calling close")
+				log := logrus.WithField("alias", name)
+				log.Debugf("Calling close")
 				err := conn.Close()
 				if err != nil {
-					log.Warnf("Error while closing connection: %s", err)
+					log.WithError(err).Warnf("Error while closing connection")
 				}
 				err = ups.Close()
 				if err != nil {
-					log.Warnf("Error while closing connection: %s", err)
+					log.WithError(err).Warnf("Error while closing connection")
 				}
 				m.activeConnectionRemove()
 			})
 		}
 		hookID := registerShutdownHook(connectionCloser)
 
+		if close {
+			logrus.WithField("delay", delay).Debug("Scheduling close")
+			time.AfterFunc(delay, func() {
+				logrus.Debug("Delay triggered close")
+				connectionCloser()
+			})
+		}
+
+		log := logrus.WithField("alias", name)
+		if close {
+			log = log.WithField("type", "closing")
+		}
+
+		if throttle {
+			log = log.WithField("type", "throttling")
+		}
+
 		go func() {
-			handleConnection(name, "to_upstream", throttle, rate, conn, ups)
-			connectionCloser()
-			unregisterShutdownHook(hookID)
+			handleConnection(log.WithField("direction", "upstream"), throttle, close, rate, delay, conn, ups)
+			if rate > 0 {
+				connectionCloser()
+				unregisterShutdownHook(hookID)
+			}
 		}()
 
 		go func() {
-			handleConnection(name, "from_upstream", throttle, rate, ups, conn)
-			connectionCloser()
-			unregisterShutdownHook(hookID)
+			handleConnection(log.WithField("direction", "downstream"), throttle, close, rate, delay, ups, conn)
+			if rate > 0 {
+				connectionCloser()
+				unregisterShutdownHook(hookID)
+			}
 		}()
 	}
 }
 
-func handleConnection(name, direction string, throttle bool, rate int, r *net.TCPConn, w *net.TCPConn) {
-	log := logrus.WithField("name", name).WithField("direction", direction)
-	bufSize := rate
+func handleConnection(log *logrus.Entry, throttle, close bool, rate int, delay time.Duration, r *net.TCPConn, w *net.TCPConn) {
+	bufSize := 16384
 	if throttle {
-		bufSize = bufSize >> 4
+		bufSize = rate >> 4
 	}
 	if bufSize > 16384 {
 		bufSize = 16384
 	}
-	if bufSize < 128 {
-		bufSize = 128
+	if bufSize < 1 {
+		bufSize = 1
 	}
 
 	buf := make([]byte, bufSize)
@@ -182,39 +196,40 @@ func handleConnection(name, direction string, throttle bool, rate int, r *net.TC
 
 	t0 := time.Now()
 
-	for notClosed {
-		t1 := time.Now()
-		n, readErr := r.Read(buf)
-		if readErr == io.EOF {
-			readErr = nil
-			err := r.CloseRead()
-			if err != nil {
-				log.Infof("Read returned EOF; closing on Read side")
+	if rate > 0 {
+		for notClosed {
+			t1 := time.Now()
+			n, readErr := r.Read(buf)
+			if readErr == io.EOF {
+				readErr = nil
+				err := r.CloseRead()
+				if err != nil {
+					log.Infof("Read returned EOF; closing on Read side")
+				}
+				notClosed = false
 			}
-			notClosed = false
-		}
-		m, writeErr := w.Write(buf[0:n])
-		if n != m {
-			log.WithField("undeliveredBytes", m-n).Infof("Closing connection: wrote less bytes than expected")
-			notClosed = false
-		}
-		if readErr != nil || writeErr != nil {
-			log.WithField("readErr", readErr).WithField("writeErr", writeErr).Warnf("Closing connection upon error")
-			notClosed = false
-		}
-		bytes += m
+			m, writeErr := w.Write(buf[0:n])
+			if n != m {
+				log.WithField("undeliveredBytes", m-n).Infof("Closing connection: wrote less bytes than expected")
+				notClosed = false
+			}
+			if readErr != nil || writeErr != nil {
+				log.WithField("readErr", readErr).WithField("writeErr", writeErr).Warnf("Closing connection upon error")
+				notClosed = false
+			}
+			bytes += m
 
-		if throttle {
-			waitTime := time.Duration(1000*float64(n)/float64(rate)) * time.Millisecond
-			t2 := time.Since(t1)
-			waitTime = waitTime - t2
-			if waitTime < 0 {
-				waitTime = 0
+			if time.Since(t0) > delay && throttle && rate > 0 {
+				waitTime := time.Duration(1000*float64(n)/float64(rate)) * time.Millisecond
+				t2 := time.Since(t1)
+				waitTime = waitTime - t2
+				if waitTime < 0 {
+					waitTime = 0
+				}
+				log.WithField("readbytes", n).WithField("writebytes", m).WithField("duration", waitTime.Seconds()).Debug("Sleeping")
+				time.Sleep(waitTime)
 			}
-			log.WithField("readbytes", n).WithField("writebytes", m).WithField("duration", waitTime.Seconds()).Debug("Sleeping")
-			time.Sleep(waitTime)
 		}
+		log.WithField("time", time.Since(t0).Seconds()).WithField("rate", float64(bytes)/time.Since(t0).Seconds()).WithField("bytes", bytes).Infof("Closing")
 	}
-
-	log.WithField("time", time.Since(t0).Seconds()).WithField("rate", float64(bytes)/time.Since(t0).Seconds()).WithField("bytes", bytes).Infof("Closing")
 }
