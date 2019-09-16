@@ -155,6 +155,7 @@ func main() {
 			time.AfterFunc(delay, func() {
 				logrus.Debug("Delay triggered close")
 				connectionCloser()
+				unregisterShutdownHook(hookID)
 			})
 		}
 
