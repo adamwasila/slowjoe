@@ -86,6 +86,7 @@ func main() {
 		logrus.Errorln("Could not resolve", err)
 		os.Exit(1)
 	}
+	logrus.WithField("address", upstream).Infof("Upstream set")
 
 	ln, err := net.ListenTCP("tcp", addr)
 	if err != nil {
@@ -93,7 +94,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	logrus.WithField("bind", bind).Infof("Listening now")
+	logrus.WithField("bind", bind).Infof("Listen on TCP socket")
 
 	for {
 		conn, err := ln.AcceptTCP()
@@ -108,8 +109,16 @@ func main() {
 		throttle := chance >= closeChance && chance < throttleChance
 
 		name := nameGenerator.Generate()
+		log := logrus.WithField("alias", name)
+		if close {
+			log = log.WithField("type", "closing")
+		}
 
-		logrus.WithField("alias", name).Infof("Incoming connection")
+		if throttle {
+			log = log.WithField("type", "throttling")
+		}
+
+		log.Infof("Accepting connection")
 
 		ups, err := net.DialTCP("tcp", nil, upstreamAddr)
 		if err != nil {
@@ -147,15 +156,6 @@ func main() {
 				logrus.Debug("Delay triggered close")
 				connectionCloser()
 			})
-		}
-
-		log := logrus.WithField("alias", name)
-		if close {
-			log = log.WithField("type", "closing")
-		}
-
-		if throttle {
-			log = log.WithField("type", "throttling")
 		}
 
 		go func() {
@@ -203,8 +203,9 @@ func handleConnection(log *logrus.Entry, throttle, close bool, rate int, delay t
 			if readErr == io.EOF {
 				readErr = nil
 				err := r.CloseRead()
+				log.Debugf("Read EOF")
 				if err != nil {
-					log.Infof("Read returned EOF; closing on Read side")
+					log.WithError(err).Errorf("Error closing on read side")
 				}
 				notClosed = false
 			}
@@ -229,7 +230,8 @@ func handleConnection(log *logrus.Entry, throttle, close bool, rate int, delay t
 				log.WithField("readbytes", n).WithField("writebytes", m).WithField("duration", waitTime.Seconds()).Debug("Sleeping")
 				time.Sleep(waitTime)
 			}
+			log.WithField("time", time.Since(t0).Seconds()).WithField("rate", float64(bytes)/time.Since(t0).Seconds()).WithField("bytes", bytes).Infof("Closing")
 		}
-		log.WithField("time", time.Since(t0).Seconds()).WithField("rate", float64(bytes)/time.Since(t0).Seconds()).WithField("bytes", bytes).Infof("Closing")
 	}
+
 }
