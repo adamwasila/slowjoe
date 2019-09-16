@@ -53,13 +53,15 @@ It should take few seconds for image to load which proves proxy is delaying data
 
 Help flag `-h` allows to see full configuration options:
 
-```bash
+```console
 slowjoe -h
 
-Usage of ./slowjoe:
+Usage of slowjoe:
   -a, --admin                   Enable admin console service
   -p, --admin-port int          Port for admin console service (default 6000)
   -b, --bind string             Address to bind listening socket to (default "127.0.0.1:9998")
+  -c, --close-chance float      Probability of closing socket abruptly
+  -d, --delay duration          Initial delay when connection starts to deteriorate
   -r, --rate int                Maximum data rate of bytes per second if throttling applied (see --throttle-chance)
   -t, --throttle-chance float   Probability of throttling
   -u, --upstream string         <host>[:port] of upstream service (default "127.0.0.1:8000")
