@@ -190,7 +190,7 @@ func handleConnection(log *logrus.Entry, throttle, close bool, rate int, delay t
 	}
 
 	buf := make([]byte, bufSize)
-	log.WithField("size", bufSize).Info("Buffer created")
+	log.WithField("size", bufSize).Debug("Buffer created")
 
 	bytes := 0
 	notClosed := true
@@ -211,15 +211,20 @@ func handleConnection(log *logrus.Entry, throttle, close bool, rate int, delay t
 				notClosed = false
 			}
 			m, writeErr := w.Write(buf[0:n])
+			bytes += m
+
 			if n != m {
 				log.WithField("undeliveredBytes", m-n).Infof("Closing connection: wrote less bytes than expected")
 				notClosed = false
 			}
-			if readErr != nil || writeErr != nil {
-				log.WithField("readErr", readErr).WithField("writeErr", writeErr).Warnf("Closing connection upon error")
+			if readErr != nil {
+				log.WithError(readErr).Warnf("Read returned error")
 				notClosed = false
 			}
-			bytes += m
+			if writeErr != nil {
+				log.WithError(writeErr).Warnf("Write returned error")
+				notClosed = false
+			}
 
 			if time.Since(t0) > delay && throttle && rate > 0 {
 				waitTime := time.Duration(1000*float64(n)/float64(rate)) * time.Millisecond
@@ -228,11 +233,11 @@ func handleConnection(log *logrus.Entry, throttle, close bool, rate int, delay t
 				if waitTime < 0 {
 					waitTime = 0
 				}
-				log.WithField("readbytes", n).WithField("writebytes", m).WithField("duration", waitTime.Seconds()).Debug("Sleeping")
+				log.WithField("readbytes", n).WithField("writebytes", m).WithField("duration", waitTime.Seconds()).Trace("Sleeping")
 				time.Sleep(waitTime)
 			}
 		}
-		log.WithField("time", time.Since(t0).Seconds()).WithField("rate", float64(bytes)/time.Since(t0).Seconds()).WithField("bytes", bytes).Infof("Closing")
+		log.WithField("time", time.Since(t0).Seconds()).WithField("rate", float64(bytes)/time.Since(t0).Seconds()).WithField("bytes", bytes).Info("Done")
 	}
 
 }
