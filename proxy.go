@@ -230,8 +230,8 @@ func handleConnection(log *logrus.Entry, throttle, close bool, rate int, delay t
 				log.WithField("readbytes", n).WithField("writebytes", m).WithField("duration", waitTime.Seconds()).Debug("Sleeping")
 				time.Sleep(waitTime)
 			}
-			log.WithField("time", time.Since(t0).Seconds()).WithField("rate", float64(bytes)/time.Since(t0).Seconds()).WithField("bytes", bytes).Infof("Closing")
 		}
+		log.WithField("time", time.Since(t0).Seconds()).WithField("rate", float64(bytes)/time.Since(t0).Seconds()).WithField("bytes", bytes).Infof("Closing")
 	}
 
 }
