@@ -31,7 +31,7 @@ func main() {
 
 	pflag.StringVarP(&bind, "bind", "b", "127.0.0.1:9998", "Address to bind listening socket to")
 	pflag.StringVarP(&upstream, "upstream", "u", "127.0.0.1:8000", "<host>[:port] of upstream service")
-	pflag.IntVarP(&rate, "rate", "r", 0, "Maximum data rate of bytes per second if throttling applied (see --throttle-chance)")
+	pflag.IntVarP(&rate, "rate", "r", -1, "Maximum data rate of bytes per second if throttling applied (see --throttle-chance)")
 	pflag.DurationVarP(&delay, "delay", "d", 0, "Initial delay when connection starts to deteriorate")
 	pflag.BoolVarP(&admin, "admin", "a", false, "Enable admin console service")
 	pflag.IntVarP(&adminPort, "admin-port", "p", 6000, "Port for admin console service")
@@ -53,8 +53,8 @@ func main() {
 		logrus.Fatal("Invalid config; sum of all chances must be <= 1.0")
 	}
 
-	if rate < 0 {
-		logrus.Fatal("Invalid config; rate must be >= 0")
+	if rate < -1 {
+		logrus.Fatal("Invalid config; rate must be >= 0 or -1 for unlimited")
 	}
 
 	if verbose {
@@ -161,7 +161,7 @@ func main() {
 
 		go func() {
 			handleConnection(log.WithField("direction", "upstream"), throttle, close, rate, delay, conn, ups)
-			if rate > 0 {
+			if rate != 0 {
 				connectionCloser()
 				unregisterShutdownHook(hookID)
 			}
@@ -169,7 +169,7 @@ func main() {
 
 		go func() {
 			handleConnection(log.WithField("direction", "downstream"), throttle, close, rate, delay, ups, conn)
-			if rate > 0 {
+			if rate != 0 {
 				connectionCloser()
 				unregisterShutdownHook(hookID)
 			}
@@ -179,7 +179,7 @@ func main() {
 
 func handleConnection(log *logrus.Entry, throttle, close bool, rate int, delay time.Duration, r *net.TCPConn, w *net.TCPConn) {
 	bufSize := 16384
-	if throttle {
+	if throttle && rate >= 0 {
 		bufSize = rate >> 4
 	}
 	if bufSize > 16384 {
@@ -197,7 +197,7 @@ func handleConnection(log *logrus.Entry, throttle, close bool, rate int, delay t
 
 	t0 := time.Now()
 
-	if rate > 0 {
+	if rate != 0 {
 		for notClosed {
 			t1 := time.Now()
 			n, readErr := r.Read(buf)
