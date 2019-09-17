@@ -212,7 +212,7 @@ func handleConnection(log *logrus.Entry, throttle, close bool, rate int, delay t
 			bytes += m
 
 			if n != m {
-				log.WithField("undeliveredBytes", m-n).Infof("Closing connection: wrote less bytes than expected")
+				log.WithField("undeliveredBytes", n-m).Infof("Wrote less bytes than expected")
 				notClosed = false
 			}
 			if readErr != nil {
