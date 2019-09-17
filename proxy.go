@@ -160,17 +160,19 @@ func main() {
 		}
 
 		go func() {
-			handleConnection(log.WithField("direction", "upstream"), throttle, close, rate, delay, conn, ups)
+			log = log.WithField("direction", "upstream")
+			handleConnection(log, throttle, close, rate, delay, conn, ups)
 			if rate != 0 {
-				connectionCloser()
+				closeSingleSide(log, conn, ups)
 				unregisterShutdownHook(hookID)
 			}
 		}()
 
 		go func() {
-			handleConnection(log.WithField("direction", "downstream"), throttle, close, rate, delay, ups, conn)
+			log = log.WithField("direction", "downstream")
+			handleConnection(log, throttle, close, rate, delay, ups, conn)
 			if rate != 0 {
-				connectionCloser()
+				closeSingleSide(log, ups, conn)
 				unregisterShutdownHook(hookID)
 			}
 		}()
@@ -202,12 +204,8 @@ func handleConnection(log *logrus.Entry, throttle, close bool, rate int, delay t
 			t1 := time.Now()
 			n, readErr := r.Read(buf)
 			if readErr == io.EOF {
-				readErr = nil
-				err := r.CloseRead()
 				log.Debugf("Read EOF")
-				if err != nil {
-					log.WithError(err).Errorf("Error closing on read side")
-				}
+				readErr = nil
 				notClosed = false
 			}
 			m, writeErr := w.Write(buf[0:n])
@@ -240,4 +238,15 @@ func handleConnection(log *logrus.Entry, throttle, close bool, rate int, delay t
 		log.WithField("time", time.Since(t0).Seconds()).WithField("rate", float64(bytes)/time.Since(t0).Seconds()).WithField("bytes", bytes).Info("Done")
 	}
 
+}
+
+func closeSingleSide(log *logrus.Entry, r *net.TCPConn, w *net.TCPConn) {
+	err := r.CloseRead()
+	if err != nil {
+		log.WithError(err).Errorf("Error closing reading")
+	}
+	err = w.CloseWrite()
+	if err != nil {
+		log.WithError(err).Errorf("Error closing writing")
+	}
 }
