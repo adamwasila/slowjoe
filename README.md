@@ -8,7 +8,13 @@ Small TCP proxy to test your services for reconnection & timeout procedures.
 
 Go 1.12+ should be installed in the system. While it was not tested with earlier versions of go it should work as long as you provide all required dependencies.
 
-Clone this repository or download latest version. There are no official, versioned releases yet so take latest commit from the master.
+Download to your `GOPATH` by typing standard `go get` command:
+
+```console
+go get -u github.com/adamwasila/slowjoe
+```
+
+Alternatively, clone this repository or download latest version. There are no official, versioned releases yet so take latest commit from the master. It opts for go modules thus sources may be put outside `GOPATH` to compile just fine using regular `go build` command. If put inside `GOPATH` remember to refer to documentation of your version of go and set `GO111MODULE` variable accordingly.
 
 Enter repository and issue command:
 
