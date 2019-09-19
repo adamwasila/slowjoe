@@ -179,7 +179,7 @@ func main() {
 	}
 }
 
-func handleConnection(log *logrus.Entry, throttle, close bool, rate int, delay time.Duration, r *net.TCPConn, w *net.TCPConn) {
+func calcBufSize(throttle bool, rate int) int {
 	bufSize := 16384
 	if throttle && rate >= 0 {
 		bufSize = rate >> 4
@@ -190,17 +190,27 @@ func handleConnection(log *logrus.Entry, throttle, close bool, rate int, delay t
 	if bufSize < 1 {
 		bufSize = 1
 	}
+	return bufSize
+}
 
-	buf := make([]byte, bufSize)
-	log.WithField("size", bufSize).Debug("Buffer created")
-
+func handleConnection(log *logrus.Entry, throttle, close bool, rate int, delay time.Duration, r *net.TCPConn, w *net.TCPConn) {
 	bytes := 0
 	notClosed := true
 
 	t0 := time.Now()
 
+	var buf []byte
+
 	if rate != 0 {
 		for notClosed {
+			throttleAlready := throttle && (time.Since(t0) > delay)
+			bufSize := calcBufSize(throttleAlready, rate)
+
+			if bufSize != len(buf) {
+				buf = make([]byte, bufSize)
+				log.WithField("size", bufSize).Debug("Buffer created")
+			}
+
 			t1 := time.Now()
 			n, readErr := r.Read(buf)
 			if readErr == io.EOF {
