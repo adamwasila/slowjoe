@@ -31,7 +31,7 @@ func (m *metrics) activeConnectionRemove() {
 	}
 }
 
-func (m *metrics) init(enable bool, adminPort int) {
+func (m *metrics) init(adminPort int) {
 	if m.enabled {
 		go func() {
 			http.Handle("/", MainPageHandler())

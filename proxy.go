@@ -22,18 +22,18 @@ func main() {
 	nameGenerator := namegenerator.NewNameGenerator(seed)
 
 	var bind, upstream string
-	var admin bool
 	var delay time.Duration
 	var rate, adminPort int
 	var closeChance, throttleChance float64
 	var verbose bool
 	var veryVerbose bool
+	var m metrics
 
 	pflag.StringVarP(&bind, "bind", "b", "127.0.0.1:9998", "Address to bind listening socket to")
 	pflag.StringVarP(&upstream, "upstream", "u", "127.0.0.1:8000", "<host>[:port] of upstream service")
 	pflag.IntVarP(&rate, "rate", "r", -1, "Maximum data rate of bytes per second if throttling applied (see --throttle-chance)")
 	pflag.DurationVarP(&delay, "delay", "d", 0, "Initial delay when connection starts to deteriorate")
-	pflag.BoolVarP(&admin, "admin", "a", false, "Enable admin console service")
+	pflag.BoolVarP(&m.enabled, "admin", "a", false, "Enable admin console service")
 	pflag.IntVarP(&adminPort, "admin-port", "p", 6000, "Port for admin console service")
 	pflag.BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output (debug logs)")
 	pflag.BoolVarP(&veryVerbose, "very-verbose", "w", false, "Enable very verbose output (trace logs)")
@@ -68,12 +68,10 @@ func main() {
 		"bind":       bind,
 		"upstream":   upstream,
 		"rate":       rate,
-		"admin":      admin,
 		"admin-port": adminPort,
 	}).Debugf("Config found")
 
-	var m metrics
-	m.init(admin, adminPort)
+	m.init(adminPort)
 
 	addr, err := net.ResolveTCPAddr("tcp", bind)
 	if err != nil {
