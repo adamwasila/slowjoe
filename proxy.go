@@ -10,7 +10,6 @@ import (
 
 	_ "expvar"
 
-	"github.com/goombaio/namegenerator"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 )
@@ -18,8 +17,7 @@ import (
 func main() {
 	setupGracefulStop()
 
-	seed := time.Now().UTC().UnixNano()
-	nameGenerator := namegenerator.NewNameGenerator(seed)
+	rand.Seed(time.Now().UnixNano())
 
 	var bind, upstream string
 	var delay time.Duration
@@ -106,7 +104,17 @@ func main() {
 		close := chance < closeChance
 		throttle := chance >= closeChance && chance < throttleChance
 
-		name := nameGenerator.Generate()
+		var name string
+
+		switch {
+		case close:
+			name = randomC()
+		case throttle:
+			name = randomT()
+		default:
+			name = randomR()
+		}
+
 		log := logrus.WithField("alias", name)
 		if close {
 			log = log.WithField("type", "closing")
