@@ -23,6 +23,7 @@ func main() {
 	var delay time.Duration
 	var rate, adminPort int
 	var closeChance, throttleChance float64
+	var mutualClose, onlyRead, onlyWrite bool
 	var verbose bool
 	var veryVerbose bool
 	var m metrics
@@ -31,6 +32,9 @@ func main() {
 	pflag.StringVarP(&upstream, "upstream", "u", "127.0.0.1:8000", "<host>[:port] of upstream service")
 	pflag.IntVarP(&rate, "rate", "r", -1, "Maximum data rate of bytes per second if throttling applied (see --throttle-chance)")
 	pflag.DurationVarP(&delay, "delay", "d", 0, "Initial delay when connection starts to deteriorate")
+	pflag.BoolVarP(&mutualClose, "mutual-close", "m", true, "Close both sides in case of error or eof in one direction.")
+	pflag.BoolVar(&onlyRead, "only-read", false, "Should only perform read on upstream.")
+	pflag.BoolVar(&onlyWrite, "only-write", false, "Should only perform write on upstream.")
 	pflag.BoolVarP(&m.enabled, "admin", "a", false, "Enable admin console service")
 	pflag.IntVarP(&adminPort, "admin-port", "p", 6000, "Port for admin console service")
 	pflag.BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output (debug logs)")
@@ -165,23 +169,41 @@ func main() {
 			})
 		}
 
-		go func() {
-			log = log.WithField("direction", "upstream")
-			handleConnection(log, throttle, close, rate, delay, conn, ups)
-			if rate != 0 {
-				closeSingleSide(log, conn, ups)
-				unregisterShutdownHook(hookID)
-			}
-		}()
+		if !onlyRead {
+			go func() {
+				log = log.WithField("direction", "upstream")
+				handleConnection(log, throttle, close, rate, delay, conn, ups)
+				if mutualClose && rate != 0 {
+					connectionCloser()
+					unregisterShutdownHook(hookID)
+				} else if rate != 0 {
+					closeSingleSide(log, conn, ups)
+					unregisterShutdownHook(hookID)
+				}
+			}()
+		} else {
+			logrus.Info("Closing upstream for write")
+			conn.CloseRead()
+			ups.CloseWrite()
+		}
 
-		go func() {
-			log = log.WithField("direction", "downstream")
-			handleConnection(log, throttle, close, rate, delay, ups, conn)
-			if rate != 0 {
-				closeSingleSide(log, ups, conn)
-				unregisterShutdownHook(hookID)
-			}
-		}()
+		if !onlyWrite {
+			go func() {
+				log = log.WithField("direction", "downstream")
+				handleConnection(log, throttle, close, rate, delay, ups, conn)
+				if mutualClose && rate != 0 {
+					connectionCloser()
+					unregisterShutdownHook(hookID)
+				} else if rate != 0 {
+					closeSingleSide(log, ups, conn)
+					unregisterShutdownHook(hookID)
+				}
+			}()
+		} else {
+			logrus.Info("Closing upstream for read")
+			conn.CloseWrite()
+			ups.CloseRead()
+		}
 	}
 }
 
