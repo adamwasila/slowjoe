@@ -1,6 +1,8 @@
 package main
 
 import (
+	"errors"
+	"fmt"
 	"io"
 	"math/rand"
 	"net"
@@ -38,6 +40,12 @@ func main() {
 
 	pflag.Float64VarP(&closeChance, "close-chance", "c", 0.0, "Probability of closing socket abruptly")
 	pflag.Float64VarP(&throttleChance, "throttle-chance", "t", 0.0, "Probability of throttling")
+
+	pflag.ErrHelp = errors.New("")
+	pflag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage of %s:\n\n", os.Args[0])
+		pflag.PrintDefaults()
+	}
 
 	pflag.Parse()
 
