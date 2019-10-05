@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"math/rand"
 	"net"
 	"os"
@@ -132,8 +133,6 @@ func main() {
 			log = log.WithField("type", "throttling")
 		}
 
-		log.Infof("Accepting connection")
-
 		ups, err := net.DialTCP("tcp", nil, upstreamAddr)
 		if err != nil {
 			logrus.WithError(err).Errorf("Could not connect to upstream")
@@ -143,6 +142,7 @@ func main() {
 			}
 			continue
 		}
+		log.Debugf("New connection")
 
 		m.activeConnectionAdd()
 
@@ -150,10 +150,10 @@ func main() {
 		connectionCloser := func() {
 			once.Do(func() {
 				log := logrus.WithField("alias", name)
-				log.Debugf("Calling close")
+				log.Tracef("Calling close")
 				err := conn.Close()
 				if err != nil {
-					log.WithError(err).Warnf("Error while closing connection")
+					log.WithError(err).Debugf("Error while closing connection")
 				}
 				err = ups.Close()
 				if err != nil {
@@ -165,9 +165,9 @@ func main() {
 		hookID := registerShutdownHook(connectionCloser)
 
 		if close {
-			logrus.WithField("delay", delay).Debug("Scheduling close")
+			logrus.WithField("delay", delay).Trace("Scheduling close")
 			time.AfterFunc(delay, func() {
-				logrus.Debug("Delay triggered close")
+				logrus.Trace("Delay triggered close")
 				connectionCloser()
 				unregisterShutdownHook(hookID)
 			})
@@ -222,13 +222,13 @@ func handleConnection(log *logrus.Entry, throttle, close bool, rate int, delay t
 
 			if bufSize != len(buf) {
 				buf = make([]byte, bufSize)
-				log.WithField("size", bufSize).Debug("Buffer created")
+				log.WithField("size", bufSize).Trace("Buffer created")
 			}
 
 			t1 := time.Now()
 			n, readErr := r.Read(buf)
 			if readErr == io.EOF {
-				log.Debugf("Read EOF")
+				log.Tracef("Read EOF")
 				readErr = nil
 				notClosed = false
 			}
@@ -259,7 +259,11 @@ func handleConnection(log *logrus.Entry, throttle, close bool, rate int, delay t
 				time.Sleep(waitTime)
 			}
 		}
-		log.WithField("time", time.Since(t0).Seconds()).WithField("rate", float64(bytes)/time.Since(t0).Seconds()).WithField("bytes", bytes).Info("Done")
+
+		log.WithField("duration", time.Since(t0).Round(10*time.Millisecond)).
+			WithField("rate", math.Round(float64(bytes)/time.Since(t0).Seconds())).
+			WithField("bytes", bytes).
+			Info("Completed")
 	}
 
 }
@@ -267,10 +271,10 @@ func handleConnection(log *logrus.Entry, throttle, close bool, rate int, delay t
 func closeSingleSide(log *logrus.Entry, r *net.TCPConn, w *net.TCPConn) {
 	err := r.CloseRead()
 	if err != nil {
-		log.WithError(err).Errorf("Error closing reading")
+		log.WithError(err).Debugf("Error closing reading")
 	}
 	err = w.CloseWrite()
 	if err != nil {
-		log.WithError(err).Errorf("Error closing writing")
+		log.WithError(err).Debugf("Error closing writing")
 	}
 }
