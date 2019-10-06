@@ -171,24 +171,34 @@ func main() {
 				connectionCloser()
 				unregisterShutdownHook(hookID)
 			})
+			continue
 		}
 
 		go func() {
-			log = log.WithField("direction", "upstream")
-			handleConnection(log, throttle, close, rate, delay, conn, ups)
-			if rate != 0 {
-				closeSingleSide(log, conn, ups)
-				unregisterShutdownHook(hookID)
-			}
-		}()
-
-		go func() {
-			log = log.WithField("direction", "downstream")
-			handleConnection(log, throttle, close, rate, delay, ups, conn)
-			if rate != 0 {
-				closeSingleSide(log, ups, conn)
-				unregisterShutdownHook(hookID)
-			}
+			Executor(
+				Execute(
+					func() {
+						log = log.WithField("direction", "upstream")
+						handleConnection(log, throttle, close, rate, delay, conn, ups)
+						if rate != 0 {
+							closeSingleSide(log, conn, ups)
+						}
+					},
+					func() {
+						log = log.WithField("direction", "downstream")
+						handleConnection(log, throttle, close, rate, delay, ups, conn)
+						if rate != 0 {
+							closeSingleSide(log, ups, conn)
+						}
+					},
+				),
+				WhenAllFinished(
+					func() {
+						connectionCloser()
+						unregisterShutdownHook(hookID)
+					},
+				),
+			).Run()
 		}()
 	}
 }
