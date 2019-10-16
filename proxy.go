@@ -17,6 +17,20 @@ import (
 	"github.com/spf13/pflag"
 )
 
+type instrumentation interface {
+	ConnectionOpened(id string)
+	ConnectionClosedUpstream(id string)
+	ConnectionClosedDownstream(id string)
+	ConnectionClosed(id string)
+}
+
+type nopInstrumentation struct{}
+
+func (*nopInstrumentation) ConnectionOpened(id string)           {}
+func (*nopInstrumentation) ConnectionClosedUpstream(id string)   {}
+func (*nopInstrumentation) ConnectionClosedDownstream(id string) {}
+func (*nopInstrumentation) ConnectionClosed(id string)           {}
+
 func main() {
 	setupGracefulStop()
 
@@ -28,13 +42,13 @@ func main() {
 	var closeChance, throttleChance float64
 	var verbose bool
 	var veryVerbose bool
-	var m metrics
+	var metricsEnabled bool
 
 	pflag.StringVarP(&bind, "bind", "b", "127.0.0.1:9998", "Address to bind listening socket to")
 	pflag.StringVarP(&upstream, "upstream", "u", "127.0.0.1:8000", "<host>[:port] of upstream service")
 	pflag.IntVarP(&rate, "rate", "r", -1, "Maximum data rate of bytes per second if throttling applied (see --throttle-chance)")
 	pflag.DurationVarP(&delay, "delay", "d", 0, "Initial delay when connection starts to deteriorate")
-	pflag.BoolVarP(&m.enabled, "admin", "a", false, "Enable admin console service")
+	pflag.BoolVarP(&metricsEnabled, "admin", "a", false, "Enable admin console service")
 	pflag.IntVarP(&adminPort, "admin-port", "p", 6000, "Port for admin console service")
 	pflag.BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output (debug logs)")
 	pflag.BoolVarP(&veryVerbose, "very-verbose", "w", false, "Enable very verbose output (trace logs)")
@@ -49,6 +63,13 @@ func main() {
 	}
 
 	pflag.Parse()
+
+	var i instrumentation = &nopInstrumentation{}
+	if metricsEnabled {
+		m := metrics{}
+		m.init(adminPort)
+		i = &m
+	}
 
 	throttleChance += closeChance
 
@@ -77,8 +98,6 @@ func main() {
 		"rate":       rate,
 		"admin-port": adminPort,
 	}).Debugf("Config found")
-
-	m.init(adminPort)
 
 	addr, err := net.ResolveTCPAddr("tcp", bind)
 	if err != nil {
@@ -144,7 +163,7 @@ func main() {
 		}
 		log.Debugf("New connection")
 
-		m.activeConnectionAdd()
+		i.ConnectionOpened(name)
 
 		once := sync.Once{}
 		connectionCloser := func() {
@@ -159,7 +178,7 @@ func main() {
 				if err != nil {
 					log.WithError(err).Warnf("Error while closing connection")
 				}
-				m.activeConnectionRemove()
+				i.ConnectionClosed(name)
 			})
 		}
 		hookID := registerShutdownHook(connectionCloser)
@@ -182,6 +201,7 @@ func main() {
 						handleConnection(log, throttle, close, rate, delay, conn, ups)
 						if rate != 0 {
 							closeSingleSide(log, conn, ups)
+							i.ConnectionClosedUpstream(name)
 						}
 					},
 					func() {
@@ -189,6 +209,7 @@ func main() {
 						handleConnection(log, throttle, close, rate, delay, ups, conn)
 						if rate != 0 {
 							closeSingleSide(log, ups, conn)
+							i.ConnectionClosedDownstream(name)
 						}
 					},
 				),
