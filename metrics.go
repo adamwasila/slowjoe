@@ -5,32 +5,32 @@ import (
 	"expvar"
 	"fmt"
 	"net/http"
-	"sync/atomic"
 
 	"github.com/sirupsen/logrus"
 	"github.com/zserge/metric"
 )
 
 type metrics struct {
-	activeConnections       int64
-	activeConnectionsMetric metric.Metric
+	connectionsOpenedMetric           metric.Metric
+	connectionsClosedMetric           metric.Metric
+	connectionsClosedUpstreamMetric   metric.Metric
+	connectionsClosedDownstreamMetric metric.Metric
 }
 
 func (m *metrics) ConnectionOpened(id string) {
-	val := atomic.AddInt64(&m.activeConnections, 1)
-	m.activeConnectionsMetric.Add(float64(val))
+	m.connectionsOpenedMetric.Add(float64(1))
 }
 
 func (m *metrics) ConnectionClosedUpstream(id string) {
+	m.connectionsClosedUpstreamMetric.Add(float64(1))
 }
 
 func (m *metrics) ConnectionClosedDownstream(id string) {
-
+	m.connectionsClosedDownstreamMetric.Add(float64(1))
 }
 
 func (m *metrics) ConnectionClosed(id string) {
-	val := atomic.AddInt64(&m.activeConnections, -1)
-	m.activeConnectionsMetric.Add(float64(val))
+	m.connectionsClosedMetric.Add(float64(1))
 }
 
 func (m *metrics) init(adminPort int) {
@@ -50,6 +50,12 @@ func (m *metrics) init(adminPort int) {
 			logrus.Infof("HTTP handler closed with error: %s", err)
 		}
 	}()
-	m.activeConnectionsMetric = metric.NewGauge("15m1m")
-	expvar.Publish("connections:active", m.activeConnectionsMetric)
+	m.connectionsOpenedMetric = metric.NewCounter("30m10s")
+	m.connectionsClosedMetric = metric.NewCounter("30m10s")
+	m.connectionsClosedUpstreamMetric = metric.NewCounter("30m10s")
+	m.connectionsClosedDownstreamMetric = metric.NewCounter("30m10s")
+	expvar.Publish("conn.opened", m.connectionsOpenedMetric)
+	expvar.Publish("conn.closed", m.connectionsClosedMetric)
+	expvar.Publish("conn.closed.upstream", m.connectionsClosedUpstreamMetric)
+	expvar.Publish("conn.closed.downstream", m.connectionsClosedDownstreamMetric)
 }
