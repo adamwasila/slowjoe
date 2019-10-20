@@ -5,6 +5,7 @@ import (
 	"expvar"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/zserge/metric"
@@ -15,22 +16,29 @@ type metrics struct {
 	connectionsClosedMetric           metric.Metric
 	connectionsClosedUpstreamMetric   metric.Metric
 	connectionsClosedDownstreamMetric metric.Metric
+	connectionsTimeMetric             metric.Metric
+	connectionsTransferredBytes       metric.Metric
 }
 
-func (m *metrics) ConnectionOpened(id string) {
+func (m *metrics) ConnectionOpened() {
 	m.connectionsOpenedMetric.Add(float64(1))
 }
 
-func (m *metrics) ConnectionClosedUpstream(id string) {
+func (m *metrics) ConnectionProgressed(transferredBytes int) {
+	m.connectionsTransferredBytes.Add(float64(transferredBytes))
+}
+
+func (m *metrics) ConnectionClosedUpstream() {
 	m.connectionsClosedUpstreamMetric.Add(float64(1))
 }
 
-func (m *metrics) ConnectionClosedDownstream(id string) {
+func (m *metrics) ConnectionClosedDownstream() {
 	m.connectionsClosedDownstreamMetric.Add(float64(1))
 }
 
-func (m *metrics) ConnectionClosed(id string) {
+func (m *metrics) ConnectionClosed(d time.Duration) {
 	m.connectionsClosedMetric.Add(float64(1))
+	m.connectionsTimeMetric.Add(d.Seconds())
 }
 
 func (m *metrics) init(adminPort int) {
@@ -54,8 +62,12 @@ func (m *metrics) init(adminPort int) {
 	m.connectionsClosedMetric = metric.NewCounter("30m10s")
 	m.connectionsClosedUpstreamMetric = metric.NewCounter("30m10s")
 	m.connectionsClosedDownstreamMetric = metric.NewCounter("30m10s")
+	m.connectionsTimeMetric = metric.NewHistogram("30m10s")
+	m.connectionsTransferredBytes = metric.NewCounter("30m10s")
 	expvar.Publish("conn.opened", m.connectionsOpenedMetric)
 	expvar.Publish("conn.closed", m.connectionsClosedMetric)
 	expvar.Publish("conn.closed.upstream", m.connectionsClosedUpstreamMetric)
 	expvar.Publish("conn.closed.downstream", m.connectionsClosedDownstreamMetric)
+	expvar.Publish("conn.time", m.connectionsTimeMetric)
+	expvar.Publish("conn.bytes", m.connectionsTransferredBytes)
 }

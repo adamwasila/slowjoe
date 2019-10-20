@@ -18,18 +18,20 @@ import (
 )
 
 type instrumentation interface {
-	ConnectionOpened(id string)
-	ConnectionClosedUpstream(id string)
-	ConnectionClosedDownstream(id string)
-	ConnectionClosed(id string)
+	ConnectionOpened()
+	ConnectionProgressed(transferredBytes int)
+	ConnectionClosedUpstream()
+	ConnectionClosedDownstream()
+	ConnectionClosed(d time.Duration)
 }
 
 type nopInstrumentation struct{}
 
-func (*nopInstrumentation) ConnectionOpened(id string)           {}
-func (*nopInstrumentation) ConnectionClosedUpstream(id string)   {}
-func (*nopInstrumentation) ConnectionClosedDownstream(id string) {}
-func (*nopInstrumentation) ConnectionClosed(id string)           {}
+func (*nopInstrumentation) ConnectionOpened()                         {}
+func (*nopInstrumentation) ConnectionProgressed(transferredBytes int) {}
+func (*nopInstrumentation) ConnectionClosedUpstream()                 {}
+func (*nopInstrumentation) ConnectionClosedDownstream()               {}
+func (*nopInstrumentation) ConnectionClosed(d time.Duration)          {}
 
 func main() {
 	setupGracefulStop()
@@ -126,6 +128,7 @@ func main() {
 			logrus.Errorln("Could not Accept", err)
 			continue
 		}
+		acceptedTimestamp := time.Now()
 
 		chance := rand.Float64()
 
@@ -163,7 +166,7 @@ func main() {
 		}
 		log.Debugf("New connection")
 
-		i.ConnectionOpened(name)
+		i.ConnectionOpened()
 
 		once := sync.Once{}
 		connectionCloser := func() {
@@ -178,7 +181,7 @@ func main() {
 				if err != nil {
 					log.WithError(err).Warnf("Error while closing connection")
 				}
-				i.ConnectionClosed(name)
+				i.ConnectionClosed(time.Since(acceptedTimestamp))
 			})
 		}
 		hookID := registerShutdownHook(connectionCloser)
@@ -198,18 +201,18 @@ func main() {
 				Execute(
 					func() {
 						log = log.WithField("direction", "upstream")
-						handleConnection(log, throttle, close, rate, delay, conn, ups)
+						handleConnection(log, i, throttle, close, rate, delay, conn, ups)
 						if rate != 0 {
 							closeSingleSide(log, conn, ups)
-							i.ConnectionClosedUpstream(name)
+							i.ConnectionClosedUpstream()
 						}
 					},
 					func() {
 						log = log.WithField("direction", "downstream")
-						handleConnection(log, throttle, close, rate, delay, ups, conn)
+						handleConnection(log, i, throttle, close, rate, delay, ups, conn)
 						if rate != 0 {
 							closeSingleSide(log, ups, conn)
-							i.ConnectionClosedDownstream(name)
+							i.ConnectionClosedDownstream()
 						}
 					},
 				),
@@ -238,7 +241,7 @@ func calcBufSize(throttle bool, rate int) int {
 	return bufSize
 }
 
-func handleConnection(log *logrus.Entry, throttle, close bool, rate int, delay time.Duration, r *net.TCPConn, w *net.TCPConn) {
+func handleConnection(log *logrus.Entry, inst instrumentation, throttle, close bool, rate int, delay time.Duration, r *net.TCPConn, w *net.TCPConn) {
 	bytes := 0
 	notClosed := true
 
@@ -278,6 +281,7 @@ func handleConnection(log *logrus.Entry, throttle, close bool, rate int, delay t
 				log.WithError(writeErr).Warnf("Write returned error")
 				notClosed = false
 			}
+			inst.ConnectionProgressed(m)
 
 			if time.Since(t0) > delay && throttle && rate > 0 {
 				waitTime := time.Duration(1000*float64(n)/float64(rate)) * time.Millisecond
