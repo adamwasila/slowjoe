@@ -3,6 +3,8 @@ package main
 import (
 	"html/template"
 	"net/http"
+
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -27,6 +29,10 @@ var (
 // AdminPageHandler returns static admin page
 func AdminPageHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		adminMainPage.Execute(w, nil)
+		err := adminMainPage.Execute(w, nil)
+		if err != nil {
+			logrus.WithError(err).Errorf("Failed to generate admin page")
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 	})
 }
