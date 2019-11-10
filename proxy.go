@@ -222,6 +222,11 @@ func main() {
 						unregisterShutdownHook(hookID)
 					},
 				),
+				WhenPanic(
+					func(p interface{}) {
+						logrus.WithField("panic", p).Fatalf("Unexpected panic")
+					},
+				),
 			).Run()
 		}()
 	}
