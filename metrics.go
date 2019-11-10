@@ -43,7 +43,7 @@ func (m *metrics) ConnectionClosed(d time.Duration) {
 
 func (m *metrics) init(adminPort int) {
 	go func() {
-		http.Handle("/", MainPageHandler())
+		http.Handle("/", AdminPageHandler())
 		http.Handle("/debug/metrics", metric.Handler(metric.Exposed))
 		logrus.WithField("port", adminPort).Infof("Start admin console")
 		server := &http.Server{Addr: fmt.Sprintf(":%d", adminPort), Handler: http.DefaultServeMux}

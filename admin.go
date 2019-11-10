@@ -24,7 +24,8 @@ var (
 		</html>`))
 )
 
-func MainPageHandler() http.Handler {
+// AdminPageHandler returns static admin page
+func AdminPageHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		adminMainPage.Execute(w, nil)
 	})

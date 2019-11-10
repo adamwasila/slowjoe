@@ -10,7 +10,13 @@ type executor struct {
 	jobs         []func()
 }
 
-func Executor(ops ...func(*executor) error) *executor {
+// Runner is the interface that wraps basic, argumentless Run method
+type Runner interface {
+	Run()
+}
+
+// Executor returns new instance of concurrent jobs executor
+func Executor(ops ...func(*executor) error) Runner {
 	e := &executor{}
 	for _, op := range ops {
 		op(e)
@@ -18,6 +24,8 @@ func Executor(ops ...func(*executor) error) *executor {
 	return e
 }
 
+// Execute wraps list of plain, argumentless funtions to be independent jobs
+// to be executed concurrently
 func Execute(jobs ...func()) func(*executor) error {
 	return func(e *executor) error {
 		e.jobs = append(e.jobs, jobs...)
@@ -25,6 +33,9 @@ func Execute(jobs ...func()) func(*executor) error {
 	}
 }
 
+// WhenAllFinished adds handler that is called when all jobs finishes. It will
+// be called only once and only when all jobs quit no matter of the result
+// or panic they raise.
 func WhenAllFinished(closeHandler func()) func(*executor) error {
 	return func(e *executor) error {
 		e.closeHandler = closeHandler
@@ -32,6 +43,8 @@ func WhenAllFinished(closeHandler func()) func(*executor) error {
 	}
 }
 
+// WhenPanic adds handler called for any job that panics. Note that handler
+// must be reentrant as may be called multiple times by different goroutines
 func WhenPanic(panicHandler func(interface{})) func(*executor) error {
 	return func(e *executor) error {
 		e.panicHandler = panicHandler
@@ -39,6 +52,7 @@ func WhenPanic(panicHandler func(interface{})) func(*executor) error {
 	}
 }
 
+// Run executes all jobs concurrently, call handlers - if needed and provided, then returns
 func (e *executor) Run() {
 	var wg sync.WaitGroup
 	for _, job := range e.jobs {
