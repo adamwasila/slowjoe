@@ -16,7 +16,7 @@ type Runner interface {
 }
 
 // Executor returns new instance of concurrent jobs executor
-func Executor(ops ...func(*executor) error) Runner {
+func Executor(ops ...func(*executor)) Runner {
 	e := &executor{}
 	for _, op := range ops {
 		op(e)
@@ -26,29 +26,26 @@ func Executor(ops ...func(*executor) error) Runner {
 
 // Execute wraps list of plain, argumentless funtions to be independent jobs
 // to be executed concurrently
-func Execute(jobs ...func()) func(*executor) error {
-	return func(e *executor) error {
+func Execute(jobs ...func()) func(*executor) {
+	return func(e *executor) {
 		e.jobs = append(e.jobs, jobs...)
-		return nil
 	}
 }
 
 // WhenAllFinished adds handler that is called when all jobs finishes. It will
 // be called only once and only when all jobs quit no matter of the result
 // or panic they raise.
-func WhenAllFinished(closeHandler func()) func(*executor) error {
-	return func(e *executor) error {
+func WhenAllFinished(closeHandler func()) func(*executor) {
+	return func(e *executor) {
 		e.closeHandler = closeHandler
-		return nil
 	}
 }
 
 // WhenPanic adds handler called for any job that panics. Note that handler
 // must be reentrant as may be called multiple times by different goroutines
-func WhenPanic(panicHandler func(interface{})) func(*executor) error {
-	return func(e *executor) error {
+func WhenPanic(panicHandler func(interface{})) func(*executor) {
+	return func(e *executor) {
 		e.panicHandler = panicHandler
-		return nil
 	}
 }
 
