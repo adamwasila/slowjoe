@@ -15,3 +15,20 @@ changelog:
     exclude:
     - '^docs:'
     - '^test:'
+dockers:
+  -
+    goos: linux
+    goarch: amd64
+    binaries:
+    - slowjoe
+    image_templates:
+    - "adamwasila/slowjoe:latest"
+    - "adamwasila/slowjoe:{{ .Version }}"
+    - "adamwasila/slowjoe:{{ .Major }}"
+    - "adamwasila/slowjoe:{{ .Major}}.{{ .Minor }}"
+    skip_push: false
+    dockerfile: Dockerfile
+    build_flag_templates:
+    - "--label=org.label-schema.schema-version=1.0"
+    - "--label=org.label-schema.version={{.Version}}"
+    - "--label=org.label-schema.name={{.ProjectName}}"
