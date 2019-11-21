@@ -1,8 +1,6 @@
 package main
 
 import (
-	"errors"
-	"fmt"
 	"io"
 	"math"
 	"math/rand"
@@ -14,105 +12,62 @@ import (
 	_ "expvar"
 
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/pflag"
 )
-
-type instrumentation interface {
-	ConnectionOpened()
-	ConnectionProgressed(transferredBytes int)
-	ConnectionClosedUpstream()
-	ConnectionClosedDownstream()
-	ConnectionClosed(d time.Duration)
-}
-
-type nopInstrumentation struct{}
-
-func (*nopInstrumentation) ConnectionOpened()                         {}
-func (*nopInstrumentation) ConnectionProgressed(transferredBytes int) {}
-func (*nopInstrumentation) ConnectionClosedUpstream()                 {}
-func (*nopInstrumentation) ConnectionClosedDownstream()               {}
-func (*nopInstrumentation) ConnectionClosed(d time.Duration)          {}
 
 func main() {
 	setupGracefulStop()
-
 	rand.Seed(time.Now().UnixNano())
 
-	var bind, upstream string
-	var delay time.Duration
-	var rate, adminPort int
-	var closeChance, throttleChance float64
-	var verbose bool
-	var veryVerbose bool
-	var metricsEnabled bool
+	var cfg config
+	cfg.read()
 
-	pflag.StringVarP(&bind, "bind", "b", "0.0.0.0:9998", "Address to bind listening socket to")
-	pflag.StringVarP(&upstream, "upstream", "u", "127.0.0.1:8000", "<host>[:port] of upstream service")
-	pflag.IntVarP(&rate, "rate", "r", -1, "Maximum data rate of bytes per second if throttling applied (see --throttle-chance)")
-	pflag.DurationVarP(&delay, "delay", "d", 0, "Initial delay when connection starts to deteriorate")
-	pflag.BoolVarP(&metricsEnabled, "admin", "a", false, "Enable admin console service")
-	pflag.IntVarP(&adminPort, "admin-port", "p", 6000, "Port for admin console service")
-	pflag.BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output (debug logs)")
-	pflag.BoolVarP(&veryVerbose, "very-verbose", "w", false, "Enable very verbose output (trace logs)")
-
-	pflag.Float64VarP(&closeChance, "close-chance", "c", 0.0, "Probability of closing socket abruptly")
-	pflag.Float64VarP(&throttleChance, "throttle-chance", "t", 0.0, "Probability of throttling")
-
-	pflag.ErrHelp = errors.New("")
-	pflag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage of %s:\n\n", os.Args[0])
-		pflag.PrintDefaults()
-	}
-
-	pflag.Parse()
-
-	var i instrumentation = &nopInstrumentation{}
-	if metricsEnabled {
+	var on instrumentation = &nopInstrumentation{}
+	if cfg.metricsEnabled {
 		m := metrics{}
-		m.init(adminPort)
-		i = &m
+		m.init(cfg.adminPort)
+		on = &m
 	}
 
-	throttleChance += closeChance
+	cfg.throttleChance += cfg.closeChance
 
-	if throttleChance < 0.0 || closeChance < 0.0 {
+	if cfg.throttleChance < 0.0 || cfg.closeChance < 0.0 {
 		logrus.Fatal("Invalid config; chances must be >= 0")
 	}
 
-	if throttleChance > 1.0 || closeChance > 1.0 {
+	if cfg.throttleChance > 1.0 || cfg.closeChance > 1.0 {
 		logrus.Fatal("Invalid config; sum of all chances must be <= 1.0")
 	}
 
-	if rate < -1 {
+	if cfg.rate < -1 {
 		logrus.Fatal("Invalid config; rate must be >= 0 or -1 for unlimited")
 	}
 
-	if verbose {
+	if cfg.verbose {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
-	if veryVerbose {
+	if cfg.veryVerbose {
 		logrus.SetLevel(logrus.TraceLevel)
 	}
 
 	logrus.WithFields(logrus.Fields{
-		"bind":       bind,
-		"upstream":   upstream,
-		"rate":       rate,
-		"admin-port": adminPort,
+		"bind":       cfg.bind,
+		"upstream":   cfg.upstream,
+		"rate":       cfg.rate,
+		"admin-port": cfg.adminPort,
 	}).Debugf("Config found")
 
-	addr, err := net.ResolveTCPAddr("tcp", bind)
+	addr, err := net.ResolveTCPAddr("tcp", cfg.bind)
 	if err != nil {
 		logrus.Errorln("Could not resolve", err)
 		os.Exit(1)
 	}
 
-	upstreamAddr, err := net.ResolveTCPAddr("tcp", upstream)
+	upstreamAddr, err := net.ResolveTCPAddr("tcp", cfg.upstream)
 	if err != nil {
 		logrus.Errorln("Could not resolve", err)
 		os.Exit(1)
 	}
-	logrus.WithField("address", upstream).Infof("Upstream set")
+	logrus.WithField("address", cfg.upstream).Infof("Upstream set")
 
 	ln, err := net.ListenTCP("tcp", addr)
 	if err != nil {
@@ -120,7 +75,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	logrus.WithField("bind", bind).Infof("Listen on TCP socket")
+	logrus.WithField("bind", cfg.bind).Infof("Listen on TCP socket")
 
 	for {
 		conn, err := ln.AcceptTCP()
@@ -132,8 +87,8 @@ func main() {
 
 		chance := rand.Float64()
 
-		close := chance < closeChance
-		throttle := chance >= closeChance && chance < throttleChance
+		close := chance < cfg.closeChance
+		throttle := chance >= cfg.closeChance && chance < cfg.throttleChance
 
 		var name string
 
@@ -166,7 +121,7 @@ func main() {
 		}
 		log.Debugf("New connection")
 
-		i.ConnectionOpened()
+		on.ConnectionOpened()
 
 		once := sync.Once{}
 		connectionCloser := func() {
@@ -181,14 +136,14 @@ func main() {
 				if err != nil {
 					log.WithError(err).Warnf("Error while closing connection")
 				}
-				i.ConnectionClosed(time.Since(acceptedTimestamp))
+				on.ConnectionClosed(time.Since(acceptedTimestamp))
 			})
 		}
 		hookID := registerShutdownHook(connectionCloser)
 
 		if close {
-			logrus.WithField("delay", delay).Trace("Scheduling close")
-			time.AfterFunc(delay, func() {
+			logrus.WithField("delay", cfg.delay).Trace("Scheduling close")
+			time.AfterFunc(cfg.delay, func() {
 				logrus.Trace("Delay triggered close")
 				connectionCloser()
 				unregisterShutdownHook(hookID)
@@ -201,18 +156,18 @@ func main() {
 				Execute(
 					func() {
 						log = log.WithField("direction", "upstream")
-						handleConnection(log, i, throttle, close, rate, delay, conn, ups)
-						if rate != 0 {
+						handleConnection(log, on, throttle, close, cfg.rate, cfg.delay, conn, ups)
+						if cfg.rate != 0 {
 							closeSingleSide(log, conn, ups)
-							i.ConnectionClosedUpstream()
+							on.ConnectionClosedUpstream()
 						}
 					},
 					func() {
 						log = log.WithField("direction", "downstream")
-						handleConnection(log, i, throttle, close, rate, delay, ups, conn)
-						if rate != 0 {
+						handleConnection(log, on, throttle, close, cfg.rate, cfg.delay, ups, conn)
+						if cfg.rate != 0 {
 							closeSingleSide(log, ups, conn)
-							i.ConnectionClosedDownstream()
+							on.ConnectionClosedDownstream()
 						}
 					},
 				),
