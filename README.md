@@ -85,7 +85,7 @@ slowjoe -h
 Usage of slowjoe:
   -a, --admin                   Enable admin console service
   -p, --admin-port int          Port for admin console service (default 6000)
-  -b, --bind string             Address to bind listening socket to (default "127.0.0.1:9998")
+  -b, --bind string             Address to bind listening socket to (default "0.0.0.0:9998")
   -c, --close-chance float      Probability of closing socket abruptly
   -d, --delay duration          Initial delay when connection starts to deteriorate
   -r, --rate int                Maximum data rate of bytes per second if throttling applied (see --throttle-chance)
