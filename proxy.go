@@ -46,7 +46,7 @@ func main() {
 	var veryVerbose bool
 	var metricsEnabled bool
 
-	pflag.StringVarP(&bind, "bind", "b", "127.0.0.1:9998", "Address to bind listening socket to")
+	pflag.StringVarP(&bind, "bind", "b", "0.0.0.0:9998", "Address to bind listening socket to")
 	pflag.StringVarP(&upstream, "upstream", "u", "127.0.0.1:8000", "<host>[:port] of upstream service")
 	pflag.IntVarP(&rate, "rate", "r", -1, "Maximum data rate of bytes per second if throttling applied (see --throttle-chance)")
 	pflag.DurationVarP(&delay, "delay", "d", 0, "Initial delay when connection starts to deteriorate")
