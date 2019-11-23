@@ -1,8 +1,11 @@
+![slowjoe](slowjoe-logo.png "Slow Joe")
 # Slow Joe
 
 [![Go Report Card](https://goreportcard.com/badge/adamwasila/slowjoe)](https://goreportcard.com/report/adamwasila/slowjoe) [![Build Status](https://travis-ci.com/adamwasila/slowjoe.svg?branch=master)](https://travis-ci.com/adamwasila/slowjoe)
 
-Small TCP proxy to test your services for reconnection & timeout procedures.
+Simple TCP proxy to test your services for network conditions.
+
+Simplicity is the most important aspect. No one wants to spend hours looking for dependencies then learning yet another DSL or quirks of config file, right? Downloading single, static binary (see [releases](../releases/latest) for that) and reading description of [few flags](#configuration) is all you need to start. Being docker aficionado makes things even simpler: all burden is to call `docker run` as [service image is available on docker hub](https://hub.docker.com/r/adamwasila/slowjoe).
 
 > **WARNING**: unstable product. API, configuration and behaviour may and will change without a warning.
 
