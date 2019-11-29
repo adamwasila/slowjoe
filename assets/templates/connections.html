@@ -1,0 +1,24 @@
+{{template "BEGIN" .}}
+<main class="main">
+    <div class="main-overview">
+        <div class="overviewcard">
+            Total: {{.admin.ConnectionsTotal}}
+        </div>
+        <div class="overviewcard">
+            Active: {{.admin.ConnectionsActive}}
+        </div>
+    </div>
+    <div class="main-cards">
+        {{range .admin.Connections}}
+        <div class="card {{.Type}}">
+            <div class="cardcontent">
+                <div class="card__name">{{.Name}}</div>
+                <div class="card__alias">{{.Alias}}</div>
+                <div class="card__upstream">Upstream: {{.BytesSentUpstream}}</div>
+                <div class="card__downstream">Downstream: {{.BytesSentDownstream}}</div>
+            </div>
+        </div>
+        {{end}}
+    </div>
+</main>
+{{template "END" .}}

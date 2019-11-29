@@ -1,6 +1,10 @@
+before:
+  hooks:
+  - pkger -o ./cmd/slowjoe
 builds:
 - env:
   - CGO_ENABLED=0
+  main: ./cmd/slowjoe
 archives:
 - replacements:
     darwin: Darwin

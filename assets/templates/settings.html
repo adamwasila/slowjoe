@@ -1,0 +1,19 @@
+{{template "BEGIN" .}}
+<main class="main">   
+    <h2>Settings</h2>
+    <p>
+        <table class="main__table">
+        <tr><td>Bind</td><td>{{.admin.Config.Bind}}</td></tr>
+        <tr><td>Upstream</td><td>{{.admin.Config.Upstream}}</td></tr>
+        <tr><td>Delay</td><td>{{.admin.Config.Delay}}</td></tr>
+        <tr><td>Rate</td><td>{{.admin.Config.Rate}}</td></tr>
+        <tr><td>AdminPort</td><td>{{.admin.Config.AdminPort}}</td></tr>
+        <tr><td>CloseChance</td><td>{{.admin.Config.CloseChance}}</td></tr>
+        <tr><td>ThrottleChance</td><td>{{.admin.Config.ThrottleChance}}</td></tr>
+        <tr><td>Verbose</td><td>{{.admin.Config.Verbose}}</td></tr>
+        <tr><td>VeryVerbose</td><td>{{.admin.Config.VeryVerbose}}</td></tr>
+        <tr><td>MetricsEnabled</td><td>{{.admin.Config.MetricsEnabled}}</td></tr>
+        </table>
+    </p>
+</main>
+{{template "END" .}}

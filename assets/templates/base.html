@@ -1,0 +1,32 @@
+{{define "BEGIN"}}
+<!DOCTYPE html>
+<html lang="us">
+<head>
+    <title>SlowJoe</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+    <link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+<body>
+    <div class="grid-container">
+        <header class="header">
+            <h1><a href="https://github.com/adamwasila/slowjoe">Slow Joe</a></h1>
+        </header>
+        <aside class="sidenav">
+            <img class="sidenav__img" src="/logo.png"></img>
+            <ul class="sidenav__list">
+            {{range .ui.Menu}}
+            <li class="sidenav__list-item{{if .Enabled}} sidenav__list-item-selected{{end}}"><a href="/admin/{{.Name}}">{{.Label}}</a></li>
+            {{end}}
+            </ul>
+        </aside>
+{{end}}
+{{define "END"}}        
+        <footer class="footer">
+            <div>&copy; 2019 Adam Wasila</div>
+            <div>{{.admin.Version}}</div>
+        </footer>
+    </div>
+</body>
+</html>
+{{end}}

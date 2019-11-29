@@ -1,3 +1,4 @@
 .vscode/
 slowjoe
 dist/
+./cmd/slowjoe/pkged.go
