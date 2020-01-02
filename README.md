@@ -61,6 +61,12 @@ Both behaviours may be mixed together. Here, half of connections are closed imme
 slowjoe -u "httpbin.org:80" -c 0.5 -t 0.5 -r 1000
 ```
 
+Finally point your browser to: <http://localhost:6000> to see current settings and list of currently opened connections:
+
+![webdashboard](dashboard.png "Simple dashboard")
+
+> Note: `-a` option must be set to enable web dashboard. Then `-p` may be used to set port other than default `6000`.
+
 ## Install
 
 Go 1.12+ should be installed in the system. While it was not tested with earlier versions of go it should work as long as you provide all required dependencies.
