@@ -15,6 +15,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"goji.io"
 	"goji.io/pat"
+
+	humanize "github.com/dustin/go-humanize"
 )
 
 func getAsset(filename string) (string, error) {
@@ -137,6 +139,8 @@ type ConnData struct {
 	Type                string
 	BytesSentUpstream   int
 	BytesSentDownstream int
+	Started             *time.Time
+	Finished            *time.Time
 }
 
 type AdminData struct {
@@ -146,6 +150,20 @@ type AdminData struct {
 	ConnectionsTotal  int32
 	Connections       map[string]ConnData
 	lock              sync.RWMutex
+}
+
+func (c ConnData) Since() string {
+	if c.Started == nil {
+		return "-"
+	}
+	return humanize.Time(*c.Started)
+}
+
+func (c ConnData) Until() string {
+	if c.Finished == nil {
+		return "-"
+	}
+	return humanize.Time(*c.Finished)
 }
 
 func NewAdminData() *AdminData {
@@ -159,12 +177,12 @@ func (a *AdminData) ConnectionOpened(id, alias, typ string) {
 	defer a.lock.Unlock()
 	atomic.AddInt32(&a.ConnectionsActive, 1)
 	atomic.AddInt32(&a.ConnectionsTotal, 1)
+	t := time.Now()
 	a.Connections[id] = ConnData{
-		id,
-		alias,
-		typ,
-		0,
-		0,
+		Name:    id,
+		Alias:   alias,
+		Type:    typ,
+		Started: &t,
 	}
 }
 
@@ -181,13 +199,25 @@ func (a *AdminData) ConnectionProgressed(id string, direction string, transferre
 	a.Connections[id] = conn
 }
 
-func (*AdminData) ConnectionClosedUpstream(id string)   {}
-func (*AdminData) ConnectionClosedDownstream(id string) {}
+func (*AdminData) ConnectionClosedUpstream(id string) {
+}
+
+func (*AdminData) ConnectionClosedDownstream(id string) {
+}
+
 func (a *AdminData) ConnectionClosed(id string, d time.Duration) {
+	t1 := time.Now()
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	atomic.AddInt32(&a.ConnectionsActive, -1)
-	delete(a.Connections, id)
+	conn := a.Connections[id]
+	conn.Finished = &t1
+	a.Connections[id] = conn
+	time.AfterFunc(1*time.Minute, func() {
+		a.lock.Lock()
+		defer a.lock.Unlock()
+		delete(a.Connections, id)
+	})
 }
 
 func (a *AdminData) RLock() {

@@ -14,6 +14,12 @@
             <div class="cardcontent">
                 <div class="card__name">{{.Name}}</div>
                 <div class="card__alias">{{.Alias}}</div>
+                {{if .Started}}
+                <div class="card__started">Opened: {{.Since}}</div>
+                {{end}}
+                {{if .Finished}}
+                <div class="card__finished">Closed: {{.Until}}</div>
+                {{end}}
                 <div class="card__upstream">Upstream: {{.BytesSentUpstream}}</div>
                 <div class="card__downstream">Downstream: {{.BytesSentDownstream}}</div>
             </div>
