@@ -1,4 +1,4 @@
 .vscode/
 /slowjoe
 dist/
-./cmd/slowjoe/pkged.go
+/cmd/slowjoe/pkged.go
