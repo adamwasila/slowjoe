@@ -1,4 +1,4 @@
-package main
+package slowjoe
 
 import (
 	"io"
@@ -18,9 +18,7 @@ import (
 	"github.com/adamwasila/slowjoe/config"
 )
 
-var version string = "0.0.0-snapshot"
-
-func main() {
+func Proxy(version string) {
 	setupGracefulStop()
 	rand.Seed(time.Now().UnixNano())
 
