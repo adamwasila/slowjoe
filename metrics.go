@@ -44,7 +44,7 @@ func (m *metrics) ConnectionClosed(id string, d time.Duration) {
 	m.connectionsTimeMetric.Add(d.Seconds())
 }
 
-func (m *metrics) init(adminPort int, data *admin.AdminData) {
+func (m *metrics) init(adminPort int, data *admin.AdminData, sh shutdowner) {
 	go func() {
 		mux := goji.NewMux()
 
@@ -54,7 +54,7 @@ func (m *metrics) init(adminPort int, data *admin.AdminData) {
 
 		logrus.WithField("port", adminPort).Infof("Start admin console")
 		server := &http.Server{Addr: fmt.Sprintf(":%d", adminPort), Handler: mux}
-		registerShutdownHook(func() {
+		sh.register(func() {
 			err := server.Shutdown(context.Background())
 			if err != nil {
 				logrus.Errorf("Shutdown of admin console unclean: [%s]", err)

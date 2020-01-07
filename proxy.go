@@ -18,22 +18,17 @@ import (
 	"github.com/adamwasila/slowjoe/config"
 )
 
-func Proxy(version string) {
-	setupGracefulStop()
+type Proxy struct {
+	version      string
+	cfg          config.Config
+	ln           *net.TCPListener
+	upstreamAddr *net.TCPAddr
+	shutdowner   shutdowner
+}
+
+func New(version string, cfg config.Config, sh shutdowner) *Proxy {
+	sh.start()
 	rand.Seed(time.Now().UnixNano())
-
-	var cfg config.Config
-	cfg.Read()
-
-	var on instrumentation = &nopInstrumentation{}
-	if cfg.MetricsEnabled {
-		ad := admin.NewAdminData()
-		ad.Version = version
-		ad.Config = cfg
-		m := metrics{}
-		m.init(cfg.AdminPort, ad)
-		on = composedInstrumentation([]instrumentation{ad, &m})
-	}
 
 	cfg.ThrottleChance += cfg.CloseChance
 
@@ -84,8 +79,27 @@ func Proxy(version string) {
 
 	logrus.WithField("bind", cfg.Bind).Infof("Listen on TCP socket")
 
+	return &Proxy{
+		version:      version,
+		cfg:          cfg,
+		ln:           ln,
+		upstreamAddr: upstreamAddr,
+		shutdowner:   sh,
+	}
+}
+
+func (p *Proxy) Loop() {
+	var on instrumentation = &nopInstrumentation{}
+	if p.cfg.MetricsEnabled {
+		ad := admin.NewAdminData()
+		ad.Version = p.version
+		ad.Config = p.cfg
+		m := metrics{}
+		m.init(p.cfg.AdminPort, ad, p.shutdowner)
+		on = composedInstrumentation([]instrumentation{ad, &m})
+	}
 	for {
-		conn, err := ln.AcceptTCP()
+		conn, err := p.ln.AcceptTCP()
 		if err != nil {
 			logrus.Errorln("Could not Accept", err)
 			continue
@@ -94,8 +108,8 @@ func Proxy(version string) {
 
 		chance := rand.Float64()
 
-		close := chance < cfg.CloseChance
-		throttle := chance >= cfg.CloseChance && chance < cfg.ThrottleChance
+		close := chance < p.cfg.CloseChance
+		throttle := chance >= p.cfg.CloseChance && chance < p.cfg.ThrottleChance
 
 		var id, name string
 
@@ -123,7 +137,7 @@ func Proxy(version string) {
 
 		log = log.WithField("type", typ)
 
-		ups, err := net.DialTCP("tcp", nil, upstreamAddr)
+		ups, err := net.DialTCP("tcp", nil, p.upstreamAddr)
 		if err != nil {
 			logrus.WithError(err).Errorf("Could not connect to upstream")
 			err := conn.Close()
@@ -152,14 +166,14 @@ func Proxy(version string) {
 				on.ConnectionClosed(id, time.Since(acceptedTimestamp))
 			})
 		}
-		hookID := registerShutdownHook(connectionCloser)
+		hookID := p.shutdowner.register(connectionCloser)
 
 		if close {
-			logrus.WithField("delay", cfg.Delay).Trace("Scheduling close")
-			time.AfterFunc(cfg.Delay, func() {
+			logrus.WithField("delay", p.cfg.Delay).Trace("Scheduling close")
+			time.AfterFunc(p.cfg.Delay, func() {
 				logrus.Trace("Delay triggered close")
 				connectionCloser()
-				unregisterShutdownHook(hookID)
+				p.shutdowner.unregister(hookID)
 			})
 			continue
 		}
@@ -168,15 +182,15 @@ func Proxy(version string) {
 			Executor(
 				Execute(
 					func() {
-						handleConnection(log, config.DirUpstream, on, id, throttle, close, cfg.Rate, cfg.Delay, conn, ups)
-						if cfg.Rate != 0 {
+						handleConnection(log, config.DirUpstream, on, id, throttle, close, p.cfg.Rate, p.cfg.Delay, conn, ups)
+						if p.cfg.Rate != 0 {
 							closeSingleSide(log, conn, ups)
 							on.ConnectionClosedUpstream(id)
 						}
 					},
 					func() {
-						handleConnection(log, config.DirDownstream, on, id, throttle, close, cfg.Rate, cfg.Delay, ups, conn)
-						if cfg.Rate != 0 {
+						handleConnection(log, config.DirDownstream, on, id, throttle, close, p.cfg.Rate, p.cfg.Delay, ups, conn)
+						if p.cfg.Rate != 0 {
 							closeSingleSide(log, ups, conn)
 							on.ConnectionClosedDownstream(id)
 						}
@@ -185,7 +199,7 @@ func Proxy(version string) {
 				WhenAllFinished(
 					func() {
 						connectionCloser()
-						unregisterShutdownHook(hookID)
+						p.shutdowner.unregister(hookID)
 					},
 				),
 				WhenPanic(
