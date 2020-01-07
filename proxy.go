@@ -21,7 +21,7 @@ import (
 type Proxy struct {
 	version      string
 	cfg          config.Config
-	ln           *net.TCPListener
+	bindAddr     *net.TCPAddr
 	upstreamAddr *net.TCPAddr
 	shutdowner   shutdowner
 }
@@ -75,24 +75,24 @@ func New(version string, cfg config.Config, sh shutdowner) *Proxy {
 	}
 	logrus.WithField("address", cfg.Upstream).Infof("Upstream set")
 
-	ln, err := net.ListenTCP("tcp", addr)
-	if err != nil {
-		logrus.Errorln("Could not listen", err)
-		os.Exit(1)
-	}
-
-	logrus.WithField("bind", cfg.Bind).Infof("Listen on TCP socket")
-
 	return &Proxy{
 		version:      version,
 		cfg:          cfg,
-		ln:           ln,
+		bindAddr:     addr,
 		upstreamAddr: upstreamAddr,
 		shutdowner:   sh,
 	}
 }
 
-func (p *Proxy) Loop() {
+func (p *Proxy) ListenAndLoop() {
+	ln, err := net.ListenTCP("tcp", p.bindAddr)
+	if err != nil {
+		logrus.Errorln("Could not listen", err)
+		os.Exit(1)
+	}
+
+	logrus.WithField("bind", p.cfg.Bind).Infof("Listen on TCP socket")
+
 	var on instrumentation = &nopInstrumentation{}
 	if p.cfg.MetricsEnabled {
 		ad := admin.NewAdminData()
@@ -103,7 +103,7 @@ func (p *Proxy) Loop() {
 		on = composedInstrumentation([]instrumentation{ad, &m})
 	}
 	for {
-		conn, err := p.ln.AcceptTCP()
+		conn, err := ln.AcceptTCP()
 		if err != nil {
 			logrus.Errorln("Could not Accept", err)
 			continue

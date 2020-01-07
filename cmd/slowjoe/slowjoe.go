@@ -25,5 +25,5 @@ func main() {
 
 	sh := slowjoe.SignalShutdowner{}
 	proxy := slowjoe.New(version, cfg, &sh)
-	proxy.Loop()
+	proxy.ListenAndLoop()
 }
