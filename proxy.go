@@ -40,7 +40,6 @@ type connection struct {
 
 func New(version string, cfg config.Config, sh shutdowner) *Proxy {
 	sh.start()
-	rand.Seed(time.Now().UnixNano())
 
 	cfg.ThrottleChance += cfg.CloseChance
 
