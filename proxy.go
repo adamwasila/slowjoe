@@ -26,6 +26,18 @@ type Proxy struct {
 	shutdowner   shutdowner
 }
 
+type connection struct {
+	log             *logrus.Entry
+	direction       string
+	inst            instrumentation
+	id              string
+	throttle, close bool
+	rate            int
+	delay           time.Duration
+	r               *net.TCPConn
+	w               *net.TCPConn
+}
+
 func New(version string, cfg config.Config, sh shutdowner) *Proxy {
 	sh.start()
 	rand.Seed(time.Now().UnixNano())
@@ -182,14 +194,16 @@ func (p *Proxy) Loop() {
 			Executor(
 				Execute(
 					func() {
-						handleConnection(log, config.DirUpstream, on, id, throttle, close, p.cfg.Rate, p.cfg.Delay, conn, ups)
+						c := connection{log, config.DirUpstream, on, id, throttle, close, p.cfg.Rate, p.cfg.Delay, conn, ups}
+						c.handleConnection()
 						if p.cfg.Rate != 0 {
 							closeSingleSide(log, conn, ups)
 							on.ConnectionClosedUpstream(id)
 						}
 					},
 					func() {
-						handleConnection(log, config.DirDownstream, on, id, throttle, close, p.cfg.Rate, p.cfg.Delay, ups, conn)
+						c := connection{log, config.DirDownstream, on, id, throttle, close, p.cfg.Rate, p.cfg.Delay, ups, conn}
+						c.handleConnection()
 						if p.cfg.Rate != 0 {
 							closeSingleSide(log, ups, conn)
 							on.ConnectionClosedDownstream(id)
@@ -212,10 +226,10 @@ func (p *Proxy) Loop() {
 	}
 }
 
-func calcBufSize(throttle bool, rate int) int {
+func (c *connection) calcBufSize(inThrottle bool) int {
 	bufSize := 16384
-	if throttle && rate >= 0 {
-		bufSize = rate >> 4
+	if inThrottle && c.rate >= 0 {
+		bufSize = c.rate >> 4
 	}
 	if bufSize > 16384 {
 		bufSize = 16384
@@ -226,7 +240,7 @@ func calcBufSize(throttle bool, rate int) int {
 	return bufSize
 }
 
-func handleConnection(log *logrus.Entry, direction string, inst instrumentation, id string, throttle, close bool, rate int, delay time.Duration, r *net.TCPConn, w *net.TCPConn) {
+func (c *connection) handleConnection() {
 	bytes := 0
 	notClosed := true
 
@@ -234,12 +248,12 @@ func handleConnection(log *logrus.Entry, direction string, inst instrumentation,
 
 	var buf []byte
 
-	log = log.WithField("direction", direction)
+	log := c.log.WithField("direction", c.direction)
 
-	if rate != 0 {
+	if c.rate != 0 {
 		for notClosed {
-			throttleAlready := throttle && (time.Since(t0) > delay)
-			bufSize := calcBufSize(throttleAlready, rate)
+			throttleAlready := c.throttle && (time.Since(t0) > c.delay)
+			bufSize := c.calcBufSize(throttleAlready)
 
 			if bufSize != len(buf) {
 				buf = make([]byte, bufSize)
@@ -247,13 +261,13 @@ func handleConnection(log *logrus.Entry, direction string, inst instrumentation,
 			}
 
 			t1 := time.Now()
-			n, readErr := r.Read(buf)
+			n, readErr := c.r.Read(buf)
 			if readErr == io.EOF {
 				log.Tracef("Read EOF")
 				readErr = nil
 				notClosed = false
 			}
-			m, writeErr := w.Write(buf[0:n])
+			m, writeErr := c.w.Write(buf[0:n])
 			bytes += m
 
 			if n != m {
@@ -268,10 +282,10 @@ func handleConnection(log *logrus.Entry, direction string, inst instrumentation,
 				log.WithError(writeErr).Warnf("Write returned error")
 				notClosed = false
 			}
-			inst.ConnectionProgressed(id, direction, m)
+			c.inst.ConnectionProgressed(c.id, c.direction, m)
 
-			if time.Since(t0) > delay && throttle && rate > 0 {
-				waitTime := time.Duration(1000*float64(n)/float64(rate)) * time.Millisecond
+			if time.Since(t0) > c.delay && c.throttle && c.rate > 0 {
+				waitTime := time.Duration(1000*float64(n)/float64(c.rate)) * time.Millisecond
 				t2 := time.Since(t1)
 				waitTime = waitTime - t2
 				if waitTime < 0 {
