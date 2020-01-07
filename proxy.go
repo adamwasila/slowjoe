@@ -56,13 +56,6 @@ func New(version string, cfg config.Config, sh shutdowner) *Proxy {
 		logrus.Fatal("Invalid config; rate must be >= 0 or -1 for unlimited")
 	}
 
-	if cfg.Verbose {
-		logrus.SetLevel(logrus.DebugLevel)
-	}
-	if cfg.VeryVerbose {
-		logrus.SetLevel(logrus.TraceLevel)
-	}
-
 	logrus.WithFields(logrus.Fields{
 		"bind":       cfg.Bind,
 		"upstream":   cfg.Upstream,
