@@ -25,5 +25,9 @@ func main() {
 
 	sh := slowjoe.SignalShutdowner{}
 	proxy := slowjoe.New(version, cfg, &sh)
-	proxy.ListenAndLoop()
+	err := proxy.ListenAndLoop()
+	if err != nil {
+		logrus.WithError(err).Infof("Main loop break. Service will quit shortly")
+	}
+	sh.TryExit()
 }

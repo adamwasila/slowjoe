@@ -84,12 +84,14 @@ func New(version string, cfg config.Config, sh shutdowner) *Proxy {
 	}
 }
 
-func (p *Proxy) ListenAndLoop() {
+func (p *Proxy) ListenAndLoop() error {
 	ln, err := net.ListenTCP("tcp", p.bindAddr)
 	if err != nil {
-		logrus.Errorln("Could not listen", err)
-		os.Exit(1)
+		return err
 	}
+	p.shutdowner.register(func() {
+		ln.Close()
+	})
 
 	logrus.WithField("bind", p.cfg.Bind).Infof("Listen on TCP socket")
 
@@ -105,8 +107,7 @@ func (p *Proxy) ListenAndLoop() {
 	for {
 		conn, err := ln.AcceptTCP()
 		if err != nil {
-			logrus.Errorln("Could not Accept", err)
-			continue
+			return err
 		}
 		acceptedTimestamp := time.Now()
 

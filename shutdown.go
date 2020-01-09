@@ -17,9 +17,10 @@ type shutdowner interface {
 }
 
 type SignalShutdowner struct {
-	shutdownHookID int64
-	shutdownHooks  map[int64]func()
-	hooksLock      sync.RWMutex
+	shutdownHookID  int64
+	shutdownHooks   map[int64]func()
+	hooksLock       sync.RWMutex
+	shutdownCleanup sync.Once
 }
 
 func (s *SignalShutdowner) register(hook func()) int64 {
@@ -64,9 +65,15 @@ func (s *SignalShutdowner) start() {
 	go func() {
 		sig := <-gracefulStop
 		logrus.Infof("Caught signal: %+v", sig)
+		s.TryExit()
+	}()
+}
+
+func (s *SignalShutdowner) TryExit() {
+	s.shutdownCleanup.Do(func() {
 		s.callShutdownHooks()
 		logrus.Info("Wait for 2 second to finish processing")
 		time.Sleep(2 * time.Second)
 		os.Exit(0)
-	}()
+	})
 }
