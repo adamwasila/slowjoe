@@ -19,7 +19,7 @@ type shutdowner interface {
 type SignalShutdowner struct {
 	shutdownHookID  int64
 	shutdownHooks   map[int64]func()
-	hooksLock       sync.RWMutex
+	hooksLock       sync.Mutex
 	shutdownCleanup sync.Once
 }
 
