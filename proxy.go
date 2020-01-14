@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -107,6 +108,9 @@ func (p *Proxy) ListenAndLoop() error {
 	for {
 		conn, err := ln.AcceptTCP()
 		if err != nil {
+			if strings.Contains(err.Error(), "use of closed network connection") {
+				return nil
+			}
 			return err
 		}
 		acceptedTimestamp := time.Now()
