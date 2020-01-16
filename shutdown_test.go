@@ -8,7 +8,7 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-func Test1(t *testing.T) {
+func TestShutdowner(t *testing.T) {
 	Convey("Given shutdowner default instance and shutdown hook", t, func() {
 		s := SignalShutdowner{}
 		var hookCounter int32 = 0
