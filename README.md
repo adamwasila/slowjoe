@@ -2,7 +2,7 @@
 
 # Slow Joe
 
-[![Go Report Card](https://goreportcard.com/badge/adamwasila/slowjoe)](https://goreportcard.com/report/adamwasila/slowjoe) [![Build Status](https://travis-ci.com/adamwasila/slowjoe.svg?branch=master)](https://travis-ci.com/adamwasila/slowjoe) [![Coverage Status](https://coveralls.io/repos/github/adamwasila/slowjoe/badge.svg?branch=testcoverage)](https://coveralls.io/github/adamwasila/slowjoe?branch=master)
+[![Go Report Card](https://goreportcard.com/badge/adamwasila/slowjoe)](https://goreportcard.com/report/adamwasila/slowjoe) [![Build Status](https://travis-ci.com/adamwasila/slowjoe.svg?branch=master)](https://travis-ci.com/adamwasila/slowjoe) [![Coverage Status](https://coveralls.io/repos/github/adamwasila/slowjoe/badge.svg?branch=master)](https://coveralls.io/github/adamwasila/slowjoe?branch=master)
 
 Simple TCP proxy to test your services for poor network conditions.
 
