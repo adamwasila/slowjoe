@@ -20,7 +20,7 @@ func TestShutdowner(t *testing.T) {
 			s.callShutdownHooks()
 
 			Convey("Hook will not be called on shutdown", func() {
-				So(hookCounter, ShouldEqual, 1)
+				So(hookCounter, ShouldEqual, 0)
 			})
 		})
 
