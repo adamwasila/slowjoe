@@ -40,7 +40,7 @@ type connection struct {
 }
 
 func New(version string, cfg config.Config, sh shutdowner) *Proxy {
-	sh.start()
+	sh.start(os.Exit)
 
 	cfg.ThrottleChance += cfg.CloseChance
 

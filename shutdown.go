@@ -11,7 +11,7 @@ import (
 )
 
 type shutdowner interface {
-	start()
+	start(exiter func(int))
 	register(hook func()) int64
 	unregister(ID int64)
 }
@@ -58,22 +58,22 @@ func (s *SignalShutdowner) callShutdownHooks() {
 	}
 }
 
-func (s *SignalShutdowner) start() {
+func (s *SignalShutdowner) start(exiter func(int)) {
 	var gracefulStop = make(chan os.Signal)
 	signal.Notify(gracefulStop, syscall.SIGTERM)
 	signal.Notify(gracefulStop, syscall.SIGINT)
 	go func() {
 		sig := <-gracefulStop
 		logrus.Infof("Caught signal: %+v", sig)
-		s.TryExit()
+		s.TryExit(exiter)
 	}()
 }
 
-func (s *SignalShutdowner) TryExit() {
+func (s *SignalShutdowner) TryExit(exiter func(int)) {
 	s.shutdownCleanup.Do(func() {
 		s.callShutdownHooks()
 		logrus.Info("Wait for 2 second to finish processing")
 		time.Sleep(2 * time.Second)
-		os.Exit(0)
+		exiter(0)
 	})
 }

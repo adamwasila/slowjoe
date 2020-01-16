@@ -2,6 +2,7 @@ package main
 
 import (
 	"math/rand"
+	"os"
 	"time"
 
 	"github.com/adamwasila/slowjoe"
@@ -29,5 +30,5 @@ func main() {
 	if err != nil {
 		logrus.WithError(err).Infof("Main loop break. Service will quit shortly")
 	}
-	sh.TryExit()
+	sh.TryExit(os.Exit)
 }
