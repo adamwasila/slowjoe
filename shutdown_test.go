@@ -16,6 +16,14 @@ func TestShutdowner(t *testing.T) {
 			atomic.AddInt32(&hookCounter, 1)
 		}
 
+		Convey("When no hook is registered and shutdown is called", func() {
+			s.callShutdownHooks()
+
+			Convey("Hook will not be called on shutdown", func() {
+				So(hookCounter, ShouldEqual, 1)
+			})
+		})
+
 		Convey("When hook is registered and shutdown is called", func() {
 			s.register(hook)
 			s.callShutdownHooks()
