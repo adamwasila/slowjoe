@@ -24,6 +24,15 @@ func TestShutdowner(t *testing.T) {
 			})
 		})
 
+		Convey("When fake hook is unregistered first and shutdown is called", func() {
+			s.unregister(0)
+			s.callShutdownHooks()
+
+			Convey("Hook will not be called on shutdown", func() {
+				So(hookCounter, ShouldEqual, 0)
+			})
+		})
+
 		Convey("When hook is registered and shutdown is called", func() {
 			s.register(hook)
 			s.callShutdownHooks()
