@@ -69,7 +69,9 @@ func TestShutdowner(t *testing.T) {
 
 			Convey("And when SIGINT signal is sent to the process and tryExit will be used to wait", func() {
 
-				syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+				err := syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+				So(err, ShouldBeNil)
+
 				s.TryExit(func(int) {})
 
 				Convey("Shutdown hooks will be called once", func() {
@@ -79,7 +81,9 @@ func TestShutdowner(t *testing.T) {
 
 			Convey("And when SIGTERM signal is sent to the process and tryExit will be used to wait", func() {
 
-				syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+				err := syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+				So(err, ShouldBeNil)
+
 				s.TryExit(func(int) {})
 
 				Convey("Shutdown hooks will be called once", func() {
