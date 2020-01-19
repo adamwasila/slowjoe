@@ -5,6 +5,7 @@ import "time"
 type instrumentation interface {
 	ConnectionOpened(id, alias, typ string)
 	ConnectionProgressed(id, direction string, transferredBytes int)
+	ConnectionDelayed(id, direction string, delay time.Duration)
 	ConnectionClosedUpstream(id string)
 	ConnectionClosedDownstream(id string)
 	ConnectionClosed(id string, d time.Duration)
@@ -14,6 +15,7 @@ type nopInstrumentation struct{}
 
 func (*nopInstrumentation) ConnectionOpened(id, alias, typ string)                          {}
 func (*nopInstrumentation) ConnectionProgressed(id, direction string, transferredBytes int) {}
+func (*nopInstrumentation) ConnectionDelayed(id, direction string, delay time.Duration)     {}
 func (*nopInstrumentation) ConnectionClosedUpstream(id string)                              {}
 func (*nopInstrumentation) ConnectionClosedDownstream(id string)                            {}
 func (*nopInstrumentation) ConnectionClosed(id string, d time.Duration)                     {}
@@ -29,6 +31,12 @@ func (ci composedInstrumentation) ConnectionOpened(id, alias, typ string) {
 func (ci composedInstrumentation) ConnectionProgressed(id, direction string, transferredBytes int) {
 	for _, i := range ci {
 		i.ConnectionProgressed(id, direction, transferredBytes)
+	}
+}
+
+func (ci composedInstrumentation) ConnectionDelayed(id, direction string, delay time.Duration) {
+	for _, i := range ci {
+		i.ConnectionDelayed(id, direction, delay)
 	}
 }
 

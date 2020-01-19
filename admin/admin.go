@@ -199,6 +199,9 @@ func (a *AdminData) ConnectionProgressed(id string, direction string, transferre
 	a.Connections[id] = conn
 }
 
+func (a *AdminData) ConnectionDelayed(id string, direction string, delay time.Duration) {
+}
+
 func (*AdminData) ConnectionClosedUpstream(id string) {
 }
 

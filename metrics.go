@@ -31,6 +31,9 @@ func (m *metrics) ConnectionProgressed(id, direction string, transferredBytes in
 	m.connectionsTransferredBytes.Add(float64(transferredBytes))
 }
 
+func (m *metrics) ConnectionDelayed(id, direction string, delay time.Duration) {
+}
+
 func (m *metrics) ConnectionClosedUpstream(id string) {
 	m.connectionsClosedUpstreamMetric.Add(float64(1))
 }

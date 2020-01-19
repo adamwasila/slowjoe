@@ -313,6 +313,7 @@ func (c *connection) handleConnection() {
 					waitTime = 0
 				}
 				log.WithField("readbytes", n).WithField("writebytes", m).WithField("duration", waitTime.Seconds()).Trace("Sleeping")
+				c.inst.ConnectionDelayed(c.id, c.direction, waitTime)
 				time.Sleep(waitTime)
 			}
 		}
