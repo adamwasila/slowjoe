@@ -11,48 +11,44 @@ type instrumentation interface {
 	ConnectionClosed(id string, d time.Duration)
 }
 
-type nopInstrumentation struct{}
+type instrumentations []instrumentation
 
-func (*nopInstrumentation) ConnectionOpened(id, alias, typ string)                          {}
-func (*nopInstrumentation) ConnectionProgressed(id, direction string, transferredBytes int) {}
-func (*nopInstrumentation) ConnectionDelayed(id, direction string, delay time.Duration)     {}
-func (*nopInstrumentation) ConnectionClosedUpstream(id string)                              {}
-func (*nopInstrumentation) ConnectionClosedDownstream(id string)                            {}
-func (*nopInstrumentation) ConnectionClosed(id string, d time.Duration)                     {}
+func (ci instrumentations) Add(i instrumentation) instrumentations {
+	ci = append(ci, i)
+	return ci
+}
 
-type composedInstrumentation []instrumentation
-
-func (ci composedInstrumentation) ConnectionOpened(id, alias, typ string) {
+func (ci instrumentations) ConnectionOpened(id, alias, typ string) {
 	for _, i := range ci {
 		i.ConnectionOpened(id, alias, typ)
 	}
 }
 
-func (ci composedInstrumentation) ConnectionProgressed(id, direction string, transferredBytes int) {
+func (ci instrumentations) ConnectionProgressed(id, direction string, transferredBytes int) {
 	for _, i := range ci {
 		i.ConnectionProgressed(id, direction, transferredBytes)
 	}
 }
 
-func (ci composedInstrumentation) ConnectionDelayed(id, direction string, delay time.Duration) {
+func (ci instrumentations) ConnectionDelayed(id, direction string, delay time.Duration) {
 	for _, i := range ci {
 		i.ConnectionDelayed(id, direction, delay)
 	}
 }
 
-func (ci composedInstrumentation) ConnectionClosedUpstream(id string) {
+func (ci instrumentations) ConnectionClosedUpstream(id string) {
 	for _, i := range ci {
 		i.ConnectionClosedUpstream(id)
 	}
 }
 
-func (ci composedInstrumentation) ConnectionClosedDownstream(id string) {
+func (ci instrumentations) ConnectionClosedDownstream(id string) {
 	for _, i := range ci {
 		i.ConnectionClosedDownstream(id)
 	}
 }
 
-func (ci composedInstrumentation) ConnectionClosed(id string, d time.Duration) {
+func (ci instrumentations) ConnectionClosed(id string, d time.Duration) {
 	for _, i := range ci {
 		i.ConnectionClosed(id, d)
 	}

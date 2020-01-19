@@ -120,15 +120,17 @@ func (p *Proxy) ListenAndLoop() error {
 
 	logrus.WithField("bind", p.cfg.Bind).Infof("Listen on TCP socket")
 
-	var on instrumentation = &nopInstrumentation{}
+	var on instrumentations
+
 	if p.cfg.MetricsEnabled {
 		ad := admin.NewAdminData()
 		ad.Version = p.version
 		ad.Config = p.cfg
 		m := metrics{}
 		m.init(p.cfg.AdminPort, ad, p.shutdowner)
-		on = composedInstrumentation([]instrumentation{ad, &m})
+		on = append(on, ad, &m)
 	}
+
 	for {
 		conn, err := ln.AcceptTCP()
 		if err != nil {
