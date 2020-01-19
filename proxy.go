@@ -1,11 +1,11 @@
 package slowjoe
 
 import (
+	"errors"
 	"io"
 	"math"
 	"math/rand"
 	"net"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -39,53 +39,77 @@ type connection struct {
 	w               *net.TCPConn
 }
 
-func New(version string, cfg config.Config, sh shutdowner) *Proxy {
-	sh.start(os.Exit)
+type proxyOption func(*Proxy) error
 
-	cfg.ThrottleChance += cfg.CloseChance
-
-	if cfg.ThrottleChance < 0.0 || cfg.CloseChance < 0.0 {
-		logrus.Fatal("Invalid config; chances must be >= 0")
-	}
-
-	if cfg.ThrottleChance > 1.0 || cfg.CloseChance > 1.0 {
-		logrus.Fatal("Invalid config; sum of all chances must be <= 1.0")
-	}
-
-	if cfg.Rate < -1 {
-		logrus.Fatal("Invalid config; rate must be >= 0 or -1 for unlimited")
-	}
-
-	logrus.WithFields(logrus.Fields{
-		"bind":       cfg.Bind,
-		"upstream":   cfg.Upstream,
-		"rate":       cfg.Rate,
-		"admin-port": cfg.AdminPort,
-	}).Debugf("Config found")
-
-	addr, err := net.ResolveTCPAddr("tcp", cfg.Bind)
-	if err != nil {
-		logrus.Errorln("Could not resolve", err)
-		os.Exit(1)
-	}
-
-	upstreamAddr, err := net.ResolveTCPAddr("tcp", cfg.Upstream)
-	if err != nil {
-		logrus.Errorln("Could not resolve", err)
-		os.Exit(1)
-	}
-	logrus.WithField("address", cfg.Upstream).Infof("Upstream set")
-
-	return &Proxy{
-		version:      version,
-		cfg:          cfg,
-		bindAddr:     addr,
-		upstreamAddr: upstreamAddr,
-		shutdowner:   sh,
+func Version(version string) proxyOption {
+	return func(p *Proxy) error {
+		p.version = version
+		return nil
 	}
 }
 
+func Shutdowner(sh shutdowner) proxyOption {
+	return func(p *Proxy) error {
+		p.shutdowner = sh
+		return nil
+	}
+}
+
+func Bind(bindAddress string) proxyOption {
+	return func(p *Proxy) error {
+		addr, err := net.ResolveTCPAddr("tcp", bindAddress)
+		p.bindAddr = addr
+		return err
+	}
+}
+
+func Upstream(upstreamAddress string) proxyOption {
+	return func(p *Proxy) error {
+		addr, err := net.ResolveTCPAddr("tcp", upstreamAddress)
+		p.upstreamAddr = addr
+		return err
+	}
+}
+
+func Config(cfg config.Config) proxyOption {
+	return func(p *Proxy) error {
+		cfg.ThrottleChance += cfg.CloseChance
+
+		if cfg.ThrottleChance < 0.0 || cfg.CloseChance < 0.0 {
+			return errors.New("Invalid config; chances must be >= 0")
+		}
+
+		if cfg.ThrottleChance > 1.0 || cfg.CloseChance > 1.0 {
+			return errors.New("Invalid config; sum of all chances must be <= 1.0")
+		}
+
+		if cfg.Rate < -1 {
+			return errors.New("Invalid config; rate must be >= 0 or -1 for unlimited")
+		}
+		p.cfg = cfg
+		return nil
+	}
+}
+
+func New(options ...proxyOption) (*Proxy, error) {
+	p := &Proxy{}
+	for _, option := range options {
+		err := option(p)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return p, nil
+}
+
 func (p *Proxy) ListenAndLoop() error {
+	logrus.WithFields(logrus.Fields{
+		"bind":       p.cfg.Bind,
+		"upstream":   p.cfg.Upstream,
+		"rate":       p.cfg.Rate,
+		"admin-port": p.cfg.AdminPort,
+	}).Debugf("Config found")
+
 	ln, err := net.ListenTCP("tcp", p.bindAddr)
 	if err != nil {
 		return err

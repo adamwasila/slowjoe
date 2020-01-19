@@ -25,8 +25,19 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 
 	sh := slowjoe.SignalShutdowner{}
-	proxy := slowjoe.New(version, cfg, &sh)
-	err := proxy.ListenAndLoop()
+
+	proxy, err := slowjoe.New(
+		slowjoe.Version(version),
+		slowjoe.Config(cfg),
+		slowjoe.Bind(cfg.Bind),
+		slowjoe.Upstream(cfg.Upstream),
+		slowjoe.Shutdowner(&sh),
+	)
+	if err != nil {
+		logrus.Fatal(err.Error())
+	}
+
+	err = proxy.ListenAndLoop()
 	if err != nil {
 		logrus.WithError(err).Infof("Main loop break. Service will quit shortly")
 	}
