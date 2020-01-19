@@ -218,7 +218,7 @@ func (p *Proxy) ListenAndLoop() error {
 						c := connection{log, config.DirUpstream, on, id, throttle, close, p.cfg.Rate, p.cfg.Delay, conn, ups}
 						c.handleConnection()
 						if p.cfg.Rate != 0 {
-							closeSingleSide(log, conn, ups)
+							c.closeSingleSide()
 							on.ConnectionClosedUpstream(id)
 						}
 					},
@@ -226,7 +226,7 @@ func (p *Proxy) ListenAndLoop() error {
 						c := connection{log, config.DirDownstream, on, id, throttle, close, p.cfg.Rate, p.cfg.Delay, ups, conn}
 						c.handleConnection()
 						if p.cfg.Rate != 0 {
-							closeSingleSide(log, ups, conn)
+							c.closeSingleSide()
 							on.ConnectionClosedDownstream(id)
 						}
 					},
@@ -325,13 +325,13 @@ func (c *connection) handleConnection() {
 
 }
 
-func closeSingleSide(log *logrus.Entry, r *net.TCPConn, w *net.TCPConn) {
-	err := r.CloseRead()
+func (c *connection) closeSingleSide() {
+	err := c.r.CloseRead()
 	if err != nil {
-		log.WithError(err).Debugf("Error closing reading")
+		c.log.WithError(err).Debugf("Error closing reading")
 	}
-	err = w.CloseWrite()
+	err = c.w.CloseWrite()
 	if err != nil {
-		log.WithError(err).Debugf("Error closing writing")
+		c.log.WithError(err).Debugf("Error closing writing")
 	}
 }
