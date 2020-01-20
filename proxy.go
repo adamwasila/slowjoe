@@ -27,11 +27,11 @@ type Proxy struct {
 }
 
 type connection struct {
-	log             *logrus.Entry
 	direction       string
 	inst            instrumentation
 	id              string
 	alias           string
+	typ             string
 	throttle, close bool
 	rate            int
 	delay           time.Duration
@@ -103,7 +103,8 @@ func New(options ...proxyOption) (*Proxy, error) {
 }
 
 func (p *Proxy) ListenAndLoop() error {
-	logrus.WithFields(logrus.Fields{
+	log := logrus.StandardLogger()
+	log.WithFields(logrus.Fields{
 		"bind":       p.cfg.Bind,
 		"upstream":   p.cfg.Upstream,
 		"rate":       p.cfg.Rate,
@@ -118,10 +119,10 @@ func (p *Proxy) ListenAndLoop() error {
 		ln.Close()
 	})
 
-	logrus.WithField("bind", p.cfg.Bind).Infof("Listen on TCP socket")
+	log.WithField("bind", p.cfg.Bind).Infof("Listen on TCP socket")
 
 	var on instrumentations
-	on = append(on, &logs{logrus.StandardLogger()})
+	on = append(on, &logs{log})
 
 	if p.cfg.MetricsEnabled {
 		ad := admin.NewAdminData()
@@ -162,7 +163,6 @@ func (p *Proxy) ListenAndLoop() error {
 
 		typ := "regular"
 
-		log := logrus.WithField("alias", name)
 		if close {
 			typ = "closing"
 		}
@@ -170,8 +170,6 @@ func (p *Proxy) ListenAndLoop() error {
 		if throttle {
 			typ = "throttling"
 		}
-
-		log = log.WithField("type", typ)
 
 		ups, err := net.DialTCP("tcp", nil, p.upstreamAddr)
 		if err != nil {
@@ -202,10 +200,9 @@ func (p *Proxy) ListenAndLoop() error {
 		hookID := p.shutdowner.register(connectionCloser)
 
 		if close {
-			logrus.WithField("delay", p.cfg.Delay).Trace("Scheduling close")
+			on.ConnectionScheduledClose(id, name, p.cfg.Delay)
 
 			time.AfterFunc(p.cfg.Delay, func() {
-				logrus.Trace("Delay triggered close")
 				connectionCloser()
 				p.shutdowner.unregister(hookID)
 			})
@@ -216,7 +213,7 @@ func (p *Proxy) ListenAndLoop() error {
 			Executor(
 				Execute(
 					func() {
-						c := connection{log, config.DirUpstream, on, id, name, throttle, close, p.cfg.Rate, p.cfg.Delay, conn, ups}
+						c := connection{config.DirUpstream, on, id, name, typ, throttle, close, p.cfg.Rate, p.cfg.Delay, conn, ups}
 						c.handleConnection()
 						if p.cfg.Rate != 0 {
 							c.closeSingleSide()
@@ -224,7 +221,7 @@ func (p *Proxy) ListenAndLoop() error {
 						}
 					},
 					func() {
-						c := connection{log, config.DirDownstream, on, id, name, throttle, close, p.cfg.Rate, p.cfg.Delay, ups, conn}
+						c := connection{config.DirDownstream, on, id, name, typ, throttle, close, p.cfg.Rate, p.cfg.Delay, ups, conn}
 						c.handleConnection()
 						if p.cfg.Rate != 0 {
 							c.closeSingleSide()
@@ -270,7 +267,7 @@ func (c *connection) handleConnection() {
 
 	var buf []byte
 
-	log := c.log.WithField("direction", c.direction)
+	log := c.log()
 
 	if c.rate != 0 {
 		for notClosed {
@@ -321,13 +318,17 @@ func (c *connection) handleConnection() {
 	}
 }
 
+func (c *connection) log() *logrus.Entry {
+	return logrus.WithField("alias", c.alias).WithField("type", c.typ).WithField("direction", c.direction)
+}
+
 func (c *connection) closeSingleSide() {
 	err := c.r.CloseRead()
 	if err != nil {
-		c.log.WithError(err).Debugf("Error closing reading")
+		c.log().WithError(err).Debugf("Error closing reading")
 	}
 	err = c.w.CloseWrite()
 	if err != nil {
-		c.log.WithError(err).Debugf("Error closing writing")
+		c.log().WithError(err).Debugf("Error closing writing")
 	}
 }

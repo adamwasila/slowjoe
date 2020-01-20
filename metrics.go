@@ -37,6 +37,9 @@ func (m *metrics) ConnectionDelayed(id, alias, direction string, delay time.Dura
 func (m *metrics) ConnectionCompleted(id, alias, direction string, transferredBytes int, duration time.Duration) {
 }
 
+func (m *metrics) ConnectionScheduledClose(id, alias string, delay time.Duration) {
+}
+
 func (m *metrics) ConnectionClosedUpstream(id, alias string) {
 	m.connectionsClosedUpstreamMetric.Add(float64(1))
 }

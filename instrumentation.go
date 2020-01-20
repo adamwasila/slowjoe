@@ -7,6 +7,7 @@ type instrumentation interface {
 	ConnectionProgressed(id, alias, direction string, transferredBytes int)
 	ConnectionDelayed(id, alias, direction string, delay time.Duration)
 	ConnectionCompleted(id, alias, direction string, transferredBytes int, duration time.Duration)
+	ConnectionScheduledClose(id, alias string, delay time.Duration)
 	ConnectionClosedUpstream(id, alias string)
 	ConnectionClosedDownstream(id, alias string)
 	ConnectionClosed(id, alias string, duration time.Duration)
@@ -34,6 +35,12 @@ func (ci instrumentations) ConnectionProgressed(id, alias, direction string, tra
 func (ci instrumentations) ConnectionCompleted(id, alias, direction string, transferredBytes int, duration time.Duration) {
 	for _, i := range ci {
 		i.ConnectionCompleted(id, alias, direction, transferredBytes, duration)
+	}
+}
+
+func (ci instrumentations) ConnectionScheduledClose(id, alias string, delay time.Duration) {
+	for _, i := range ci {
+		i.ConnectionScheduledClose(id, alias, delay)
 	}
 }
 

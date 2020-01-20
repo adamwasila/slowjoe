@@ -33,6 +33,10 @@ func (l *logs) ConnectionCompleted(id, alias, direction string, transferredBytes
 
 }
 
+func (l *logs) ConnectionScheduledClose(id, alias string, delay time.Duration) {
+	l.log.WithField("alias", alias).WithField("delay", delay).Trace("Scheduling close")
+}
+
 func (l *logs) ConnectionClosedUpstream(id, alias string) {
 }
 

@@ -205,6 +205,9 @@ func (a *AdminData) ConnectionDelayed(id, alias string, direction string, delay 
 func (a *AdminData) ConnectionCompleted(id, alias, direction string, transferredBytes int, duration time.Duration) {
 }
 
+func (a *AdminData) ConnectionScheduledClose(id, alias string, delay time.Duration) {
+}
+
 func (*AdminData) ConnectionClosedUpstream(id, alias string) {
 }
 
