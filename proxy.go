@@ -3,7 +3,6 @@ package slowjoe
 import (
 	"errors"
 	"io"
-	"math"
 	"math/rand"
 	"net"
 	"strings"
@@ -32,6 +31,7 @@ type connection struct {
 	direction       string
 	inst            instrumentation
 	id              string
+	alias           string
 	throttle, close bool
 	rate            int
 	delay           time.Duration
@@ -121,6 +121,7 @@ func (p *Proxy) ListenAndLoop() error {
 	logrus.WithField("bind", p.cfg.Bind).Infof("Listen on TCP socket")
 
 	var on instrumentations
+	on = append(on, &logs{logrus.StandardLogger()})
 
 	if p.cfg.MetricsEnabled {
 		ad := admin.NewAdminData()
@@ -181,15 +182,12 @@ func (p *Proxy) ListenAndLoop() error {
 			}
 			continue
 		}
-		log.Debugf("New connection")
-
 		on.ConnectionOpened(id, name, typ)
 
 		once := sync.Once{}
 		connectionCloser := func() {
 			once.Do(func() {
 				log := logrus.WithField("alias", name)
-				log.Tracef("Calling close")
 				err := conn.Close()
 				if err != nil {
 					log.WithError(err).Debugf("Error while closing connection")
@@ -198,13 +196,14 @@ func (p *Proxy) ListenAndLoop() error {
 				if err != nil {
 					log.WithError(err).Warnf("Error while closing connection")
 				}
-				on.ConnectionClosed(id, time.Since(acceptedTimestamp))
+				on.ConnectionClosed(id, name, time.Since(acceptedTimestamp))
 			})
 		}
 		hookID := p.shutdowner.register(connectionCloser)
 
 		if close {
 			logrus.WithField("delay", p.cfg.Delay).Trace("Scheduling close")
+
 			time.AfterFunc(p.cfg.Delay, func() {
 				logrus.Trace("Delay triggered close")
 				connectionCloser()
@@ -217,19 +216,19 @@ func (p *Proxy) ListenAndLoop() error {
 			Executor(
 				Execute(
 					func() {
-						c := connection{log, config.DirUpstream, on, id, throttle, close, p.cfg.Rate, p.cfg.Delay, conn, ups}
+						c := connection{log, config.DirUpstream, on, id, name, throttle, close, p.cfg.Rate, p.cfg.Delay, conn, ups}
 						c.handleConnection()
 						if p.cfg.Rate != 0 {
 							c.closeSingleSide()
-							on.ConnectionClosedUpstream(id)
+							on.ConnectionClosedUpstream(id, name)
 						}
 					},
 					func() {
-						c := connection{log, config.DirDownstream, on, id, throttle, close, p.cfg.Rate, p.cfg.Delay, ups, conn}
+						c := connection{log, config.DirDownstream, on, id, name, throttle, close, p.cfg.Rate, p.cfg.Delay, ups, conn}
 						c.handleConnection()
 						if p.cfg.Rate != 0 {
 							c.closeSingleSide()
-							on.ConnectionClosedDownstream(id)
+							on.ConnectionClosedDownstream(id, name)
 						}
 					},
 				),
@@ -305,7 +304,7 @@ func (c *connection) handleConnection() {
 				log.WithError(writeErr).Warnf("Write returned error")
 				notClosed = false
 			}
-			c.inst.ConnectionProgressed(c.id, c.direction, m)
+			c.inst.ConnectionProgressed(c.id, c.alias, c.direction, m)
 
 			if time.Since(t0) > c.delay && c.throttle && c.rate > 0 {
 				waitTime := time.Duration(1000*float64(n)/float64(c.rate)) * time.Millisecond
@@ -314,18 +313,12 @@ func (c *connection) handleConnection() {
 				if waitTime < 0 {
 					waitTime = 0
 				}
-				log.WithField("readbytes", n).WithField("writebytes", m).WithField("duration", waitTime.Seconds()).Trace("Sleeping")
-				c.inst.ConnectionDelayed(c.id, c.direction, waitTime)
+				c.inst.ConnectionDelayed(c.id, c.alias, c.direction, waitTime)
 				time.Sleep(waitTime)
 			}
 		}
-
-		log.WithField("duration", time.Since(t0).Round(10*time.Millisecond)).
-			WithField("rate", math.Round(float64(bytes)/time.Since(t0).Seconds())).
-			WithField("bytes", bytes).
-			Info("Completed")
+		c.inst.ConnectionCompleted(c.id, c.alias, c.direction, bytes, time.Since(t0))
 	}
-
 }
 
 func (c *connection) closeSingleSide() {

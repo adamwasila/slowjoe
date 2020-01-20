@@ -27,22 +27,25 @@ func (m *metrics) ConnectionOpened(id, alias, typ string) {
 	m.connectionsOpenedMetric.Add(float64(1))
 }
 
-func (m *metrics) ConnectionProgressed(id, direction string, transferredBytes int) {
+func (m *metrics) ConnectionProgressed(id, alias, direction string, transferredBytes int) {
 	m.connectionsTransferredBytes.Add(float64(transferredBytes))
 }
 
-func (m *metrics) ConnectionDelayed(id, direction string, delay time.Duration) {
+func (m *metrics) ConnectionDelayed(id, alias, direction string, delay time.Duration) {
 }
 
-func (m *metrics) ConnectionClosedUpstream(id string) {
+func (m *metrics) ConnectionCompleted(id, alias, direction string, transferredBytes int, duration time.Duration) {
+}
+
+func (m *metrics) ConnectionClosedUpstream(id, alias string) {
 	m.connectionsClosedUpstreamMetric.Add(float64(1))
 }
 
-func (m *metrics) ConnectionClosedDownstream(id string) {
+func (m *metrics) ConnectionClosedDownstream(id, alias string) {
 	m.connectionsClosedDownstreamMetric.Add(float64(1))
 }
 
-func (m *metrics) ConnectionClosed(id string, d time.Duration) {
+func (m *metrics) ConnectionClosed(id, alias string, d time.Duration) {
 	m.connectionsClosedMetric.Add(float64(1))
 	m.connectionsTimeMetric.Add(d.Seconds())
 }

@@ -186,7 +186,7 @@ func (a *AdminData) ConnectionOpened(id, alias, typ string) {
 	}
 }
 
-func (a *AdminData) ConnectionProgressed(id string, direction string, transferredBytes int) {
+func (a *AdminData) ConnectionProgressed(id, alias string, direction string, transferredBytes int) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	conn := a.Connections[id]
@@ -199,16 +199,19 @@ func (a *AdminData) ConnectionProgressed(id string, direction string, transferre
 	a.Connections[id] = conn
 }
 
-func (a *AdminData) ConnectionDelayed(id string, direction string, delay time.Duration) {
+func (a *AdminData) ConnectionDelayed(id, alias string, direction string, delay time.Duration) {
 }
 
-func (*AdminData) ConnectionClosedUpstream(id string) {
+func (a *AdminData) ConnectionCompleted(id, alias, direction string, transferredBytes int, duration time.Duration) {
 }
 
-func (*AdminData) ConnectionClosedDownstream(id string) {
+func (*AdminData) ConnectionClosedUpstream(id, alias string) {
 }
 
-func (a *AdminData) ConnectionClosed(id string, d time.Duration) {
+func (*AdminData) ConnectionClosedDownstream(id, alias string) {
+}
+
+func (a *AdminData) ConnectionClosed(id, alias string, d time.Duration) {
 	t1 := time.Now()
 	a.lock.Lock()
 	defer a.lock.Unlock()

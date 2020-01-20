@@ -4,11 +4,12 @@ import "time"
 
 type instrumentation interface {
 	ConnectionOpened(id, alias, typ string)
-	ConnectionProgressed(id, direction string, transferredBytes int)
-	ConnectionDelayed(id, direction string, delay time.Duration)
-	ConnectionClosedUpstream(id string)
-	ConnectionClosedDownstream(id string)
-	ConnectionClosed(id string, d time.Duration)
+	ConnectionProgressed(id, alias, direction string, transferredBytes int)
+	ConnectionDelayed(id, alias, direction string, delay time.Duration)
+	ConnectionCompleted(id, alias, direction string, transferredBytes int, duration time.Duration)
+	ConnectionClosedUpstream(id, alias string)
+	ConnectionClosedDownstream(id, alias string)
+	ConnectionClosed(id, alias string, duration time.Duration)
 }
 
 type instrumentations []instrumentation
@@ -24,32 +25,38 @@ func (ci instrumentations) ConnectionOpened(id, alias, typ string) {
 	}
 }
 
-func (ci instrumentations) ConnectionProgressed(id, direction string, transferredBytes int) {
+func (ci instrumentations) ConnectionProgressed(id, alias, direction string, transferredBytes int) {
 	for _, i := range ci {
-		i.ConnectionProgressed(id, direction, transferredBytes)
+		i.ConnectionProgressed(id, alias, direction, transferredBytes)
 	}
 }
 
-func (ci instrumentations) ConnectionDelayed(id, direction string, delay time.Duration) {
+func (ci instrumentations) ConnectionCompleted(id, alias, direction string, transferredBytes int, duration time.Duration) {
 	for _, i := range ci {
-		i.ConnectionDelayed(id, direction, delay)
+		i.ConnectionCompleted(id, alias, direction, transferredBytes, duration)
 	}
 }
 
-func (ci instrumentations) ConnectionClosedUpstream(id string) {
+func (ci instrumentations) ConnectionDelayed(id, alias, direction string, delay time.Duration) {
 	for _, i := range ci {
-		i.ConnectionClosedUpstream(id)
+		i.ConnectionDelayed(id, alias, direction, delay)
 	}
 }
 
-func (ci instrumentations) ConnectionClosedDownstream(id string) {
+func (ci instrumentations) ConnectionClosedUpstream(id, alias string) {
 	for _, i := range ci {
-		i.ConnectionClosedDownstream(id)
+		i.ConnectionClosedUpstream(id, alias)
 	}
 }
 
-func (ci instrumentations) ConnectionClosed(id string, d time.Duration) {
+func (ci instrumentations) ConnectionClosedDownstream(id, alias string) {
 	for _, i := range ci {
-		i.ConnectionClosed(id, d)
+		i.ConnectionClosedDownstream(id, alias)
+	}
+}
+
+func (ci instrumentations) ConnectionClosed(id, alias string, d time.Duration) {
+	for _, i := range ci {
+		i.ConnectionClosed(id, alias, d)
 	}
 }
