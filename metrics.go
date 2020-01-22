@@ -14,7 +14,7 @@ import (
 	"goji.io/pat"
 )
 
-type metrics struct {
+type Metrics struct {
 	connectionsOpenedMetric           metric.Metric
 	connectionsClosedMetric           metric.Metric
 	connectionsClosedUpstreamMetric   metric.Metric
@@ -23,37 +23,37 @@ type metrics struct {
 	connectionsTransferredBytes       metric.Metric
 }
 
-func (m *metrics) ConnectionOpened(id, alias, typ string) {
+func (m *Metrics) ConnectionOpened(id, alias, typ string) {
 	m.connectionsOpenedMetric.Add(float64(1))
 }
 
-func (m *metrics) ConnectionProgressed(id, alias, direction string, transferredBytes int) {
+func (m *Metrics) ConnectionProgressed(id, alias, direction string, transferredBytes int) {
 	m.connectionsTransferredBytes.Add(float64(transferredBytes))
 }
 
-func (m *metrics) ConnectionDelayed(id, alias, direction string, delay time.Duration) {
+func (m *Metrics) ConnectionDelayed(id, alias, direction string, delay time.Duration) {
 }
 
-func (m *metrics) ConnectionCompleted(id, alias, direction string, transferredBytes int, duration time.Duration) {
+func (m *Metrics) ConnectionCompleted(id, alias, direction string, transferredBytes int, duration time.Duration) {
 }
 
-func (m *metrics) ConnectionScheduledClose(id, alias string, delay time.Duration) {
+func (m *Metrics) ConnectionScheduledClose(id, alias string, delay time.Duration) {
 }
 
-func (m *metrics) ConnectionClosedUpstream(id, alias string) {
+func (m *Metrics) ConnectionClosedUpstream(id, alias string) {
 	m.connectionsClosedUpstreamMetric.Add(float64(1))
 }
 
-func (m *metrics) ConnectionClosedDownstream(id, alias string) {
+func (m *Metrics) ConnectionClosedDownstream(id, alias string) {
 	m.connectionsClosedDownstreamMetric.Add(float64(1))
 }
 
-func (m *metrics) ConnectionClosed(id, alias string, d time.Duration) {
+func (m *Metrics) ConnectionClosed(id, alias string, d time.Duration) {
 	m.connectionsClosedMetric.Add(float64(1))
 	m.connectionsTimeMetric.Add(d.Seconds())
 }
 
-func (m *metrics) init(adminPort int, data *admin.AdminData, sh shutdowner) {
+func (m *Metrics) Init(adminPort int, data *admin.AdminData, sh shutdowner) {
 	go func() {
 		mux := goji.NewMux()
 

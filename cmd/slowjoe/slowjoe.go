@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/adamwasila/slowjoe"
+	"github.com/adamwasila/slowjoe/admin"
 	"github.com/adamwasila/slowjoe/config"
 	"github.com/sirupsen/logrus"
 )
@@ -26,12 +27,27 @@ func main() {
 
 	sh := slowjoe.SignalShutdowner{}
 
+	var insts slowjoe.Instrumentations
+	insts = append(insts, &slowjoe.Logs{logrus.StandardLogger()})
+
+	if cfg.MetricsEnabled {
+		ad := admin.NewAdminData()
+		ad.Version = version
+		ad.Config = cfg
+		m := slowjoe.Metrics{}
+		m.Init(cfg.AdminPort, ad, &sh)
+		insts = append(insts, ad, &m)
+	}
+
 	proxy, err := slowjoe.New(
 		slowjoe.Version(version),
 		slowjoe.Config(cfg),
 		slowjoe.Bind(cfg.Bind),
 		slowjoe.Upstream(cfg.Upstream),
 		slowjoe.Shutdowner(&sh),
+		slowjoe.Instrument(
+			insts,
+		),
 	)
 	if err != nil {
 		logrus.Fatal(err.Error())

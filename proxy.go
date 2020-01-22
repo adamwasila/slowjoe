@@ -14,21 +14,26 @@ import (
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 
-	"github.com/adamwasila/slowjoe/admin"
 	"github.com/adamwasila/slowjoe/config"
 )
 
 type Proxy struct {
-	version      string
-	cfg          config.Config
-	bindAddr     *net.TCPAddr
-	upstreamAddr *net.TCPAddr
-	shutdowner   shutdowner
+	version                     string
+	bind, upstream              string
+	delay                       time.Duration
+	rate                        int
+	adminPort                   int
+	closeChance, throttleChance float64
+	metricsEnabled              bool
+	bindAddr                    *net.TCPAddr
+	upstreamAddr                *net.TCPAddr
+	shutdowner                  shutdowner
+	instrumentations            Instrumentations
 }
 
 type connection struct {
 	direction       string
-	inst            instrumentation
+	inst            Instrumentation
 	id              string
 	alias           string
 	typ             string
@@ -73,20 +78,39 @@ func Upstream(upstreamAddress string) proxyOption {
 
 func Config(cfg config.Config) proxyOption {
 	return func(p *Proxy) error {
-		cfg.ThrottleChance += cfg.CloseChance
+		close := cfg.CloseChance
+		throttle := close + cfg.ThrottleChance
 
-		if cfg.ThrottleChance < 0.0 || cfg.CloseChance < 0.0 {
+		if throttle < 0.0 || close < 0.0 {
 			return errors.New("Invalid config; chances must be >= 0")
 		}
 
-		if cfg.ThrottleChance > 1.0 || cfg.CloseChance > 1.0 {
+		if throttle > 1.0 || close > 1.0 {
 			return errors.New("Invalid config; sum of all chances must be <= 1.0")
 		}
 
 		if cfg.Rate < -1 {
 			return errors.New("Invalid config; rate must be >= 0 or -1 for unlimited")
 		}
-		p.cfg = cfg
+
+		p.throttleChance = throttle
+		p.closeChance = close
+		p.rate = cfg.Rate
+
+		p.bind = cfg.Bind
+		p.upstream = cfg.Upstream
+
+		p.delay = cfg.Delay
+		p.metricsEnabled = cfg.MetricsEnabled
+		p.adminPort = cfg.AdminPort
+
+		return nil
+	}
+}
+
+func Instrument(inst ...Instrumentation) proxyOption {
+	return func(p *Proxy) error {
+		p.instrumentations = append(p.instrumentations, inst...)
 		return nil
 	}
 }
@@ -105,10 +129,10 @@ func New(options ...proxyOption) (*Proxy, error) {
 func (p *Proxy) ListenAndLoop() error {
 	log := logrus.StandardLogger()
 	log.WithFields(logrus.Fields{
-		"bind":       p.cfg.Bind,
-		"upstream":   p.cfg.Upstream,
-		"rate":       p.cfg.Rate,
-		"admin-port": p.cfg.AdminPort,
+		"bind":       p.bind,
+		"upstream":   p.upstream,
+		"rate":       p.rate,
+		"admin-port": p.adminPort,
 	}).Debugf("Config found")
 
 	ln, err := net.ListenTCP("tcp", p.bindAddr)
@@ -119,19 +143,9 @@ func (p *Proxy) ListenAndLoop() error {
 		ln.Close()
 	})
 
-	log.WithField("bind", p.cfg.Bind).Infof("Listen on TCP socket")
+	log.WithField("bind", p.bind).Infof("Listen on TCP socket")
 
-	var on instrumentations
-	on = append(on, &logs{log})
-
-	if p.cfg.MetricsEnabled {
-		ad := admin.NewAdminData()
-		ad.Version = p.version
-		ad.Config = p.cfg
-		m := metrics{}
-		m.init(p.cfg.AdminPort, ad, p.shutdowner)
-		on = append(on, ad, &m)
-	}
+	on := p.instrumentations
 
 	for {
 		conn, err := ln.AcceptTCP()
@@ -145,8 +159,8 @@ func (p *Proxy) ListenAndLoop() error {
 
 		chance := rand.Float64()
 
-		close := chance < p.cfg.CloseChance
-		throttle := chance >= p.cfg.CloseChance && chance < p.cfg.ThrottleChance
+		close := chance < p.closeChance
+		throttle := chance >= p.closeChance && chance < p.throttleChance
 
 		var id, name string
 
@@ -200,9 +214,9 @@ func (p *Proxy) ListenAndLoop() error {
 		hookID := p.shutdowner.register(connectionCloser)
 
 		if close {
-			on.ConnectionScheduledClose(id, name, p.cfg.Delay)
+			on.ConnectionScheduledClose(id, name, p.delay)
 
-			time.AfterFunc(p.cfg.Delay, func() {
+			time.AfterFunc(p.delay, func() {
 				connectionCloser()
 				p.shutdowner.unregister(hookID)
 			})
@@ -213,17 +227,17 @@ func (p *Proxy) ListenAndLoop() error {
 			Executor(
 				Execute(
 					func() {
-						c := connection{config.DirUpstream, on, id, name, typ, throttle, close, p.cfg.Rate, p.cfg.Delay, conn, ups}
+						c := connection{config.DirUpstream, on, id, name, typ, throttle, close, p.rate, p.delay, conn, ups}
 						c.handleConnection()
-						if p.cfg.Rate != 0 {
+						if p.rate != 0 {
 							c.closeSingleSide()
 							on.ConnectionClosedUpstream(id, name)
 						}
 					},
 					func() {
-						c := connection{config.DirDownstream, on, id, name, typ, throttle, close, p.cfg.Rate, p.cfg.Delay, ups, conn}
+						c := connection{config.DirDownstream, on, id, name, typ, throttle, close, p.rate, p.delay, ups, conn}
 						c.handleConnection()
-						if p.cfg.Rate != 0 {
+						if p.rate != 0 {
 							c.closeSingleSide()
 							on.ConnectionClosedDownstream(id, name)
 						}
