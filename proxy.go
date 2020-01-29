@@ -1,6 +1,7 @@
 package slowjoe
 
 import (
+	"context"
 	"errors"
 	"io"
 	"math/rand"
@@ -254,7 +255,7 @@ func (p *Proxy) ListenAndLoop() error {
 						logrus.WithField("panic", p).Fatalf("Unexpected panic")
 					},
 				),
-			).Run()
+			).Run(context.TODO())
 		}()
 	}
 }

@@ -1,6 +1,7 @@
 package slowjoe
 
 import (
+	"context"
 	"sync"
 )
 
@@ -8,11 +9,12 @@ type executor struct {
 	closeHandler func()
 	panicHandler func(interface{})
 	jobs         []func()
+	intJobs      []func(context.Context)
 }
 
 // Runner is the interface that wraps basic, argumentless Run method
 type Runner interface {
-	Run()
+	Run(ctx context.Context)
 }
 
 // Executor returns new instance of concurrent jobs executor
@@ -29,6 +31,12 @@ func Executor(ops ...func(*executor)) Runner {
 func Execute(jobs ...func()) func(*executor) {
 	return func(e *executor) {
 		e.jobs = append(e.jobs, jobs...)
+	}
+}
+
+func ExecuteWithContext(jobs ...func(context.Context)) func(*executor) {
+	return func(e *executor) {
+		e.intJobs = append(e.intJobs, jobs...)
 	}
 }
 
@@ -50,11 +58,16 @@ func WhenPanic(panicHandler func(interface{})) func(*executor) {
 }
 
 // Run executes all jobs concurrently, call handlers - if needed and provided, then returns
-func (e *executor) Run() {
+func (e *executor) Run(ctx context.Context) {
 	var wg sync.WaitGroup
 	for _, job := range e.jobs {
 		wg.Add(1)
 		go wrappedJob(&wg, e.panicHandler, job)
+	}
+
+	for _, job := range e.intJobs {
+		wg.Add(1)
+		go wrappedInterruptableJob(ctx, &wg, e.panicHandler, job)
 	}
 	wg.Wait()
 	if e.closeHandler != nil {
@@ -73,4 +86,17 @@ func wrappedJob(wg *sync.WaitGroup, onPanic func(interface{}), f func()) {
 		}()
 	}
 	f()
+}
+
+func wrappedInterruptableJob(ctx context.Context, wg *sync.WaitGroup, onPanic func(interface{}), f func(context.Context)) {
+	defer wg.Done()
+	if onPanic != nil {
+		defer func() {
+			p := recover()
+			if p != nil {
+				onPanic(p)
+			}
+		}()
+	}
+	f(ctx)
 }
