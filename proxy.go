@@ -6,6 +6,7 @@ import (
 	"io"
 	"math/rand"
 	"net"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -140,6 +141,7 @@ func (p *Proxy) ListenAndLoop() error {
 	if err != nil {
 		return err
 	}
+	p.shutdowner.start(os.Exit)
 	p.shutdowner.register(func() {
 		ln.Close()
 	})
