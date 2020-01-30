@@ -199,6 +199,7 @@ func (p *Proxy) ListenAndLoop() error {
 		}
 		on.ConnectionOpened(id, name, typ)
 
+		ctx, ctxCancel := context.WithCancel(context.Background())
 		once := sync.Once{}
 		connectionCloser := func() {
 			once.Do(func() {
@@ -211,6 +212,7 @@ func (p *Proxy) ListenAndLoop() error {
 				if err != nil {
 					log.WithError(err).Warnf("Error while closing connection")
 				}
+				ctxCancel()
 				on.ConnectionClosed(id, name, time.Since(acceptedTimestamp))
 			})
 		}
@@ -231,7 +233,7 @@ func (p *Proxy) ListenAndLoop() error {
 				Execute(
 					func() {
 						c := connection{config.DirUpstream, on, id, name, typ, throttle, close, p.rate, p.delay, conn, ups}
-						c.handleConnection()
+						c.handleConnection(ctx)
 						if p.rate != 0 {
 							c.closeSingleSide()
 							on.ConnectionClosedUpstream(id, name)
@@ -239,7 +241,7 @@ func (p *Proxy) ListenAndLoop() error {
 					},
 					func() {
 						c := connection{config.DirDownstream, on, id, name, typ, throttle, close, p.rate, p.delay, ups, conn}
-						c.handleConnection()
+						c.handleConnection(ctx)
 						if p.rate != 0 {
 							c.closeSingleSide()
 							on.ConnectionClosedDownstream(id, name)
@@ -257,7 +259,7 @@ func (p *Proxy) ListenAndLoop() error {
 						logrus.WithField("panic", p).Fatalf("Unexpected panic")
 					},
 				),
-			).Run(context.TODO())
+			).Run(ctx)
 		}()
 	}
 }
@@ -276,7 +278,7 @@ func (c *connection) calcBufSize(inThrottle bool) int {
 	return bufSize
 }
 
-func (c *connection) handleConnection() {
+func (c *connection) handleConnection(ctx context.Context) {
 	bytes := 0
 	notClosed := true
 
@@ -318,6 +320,9 @@ func (c *connection) handleConnection() {
 				log.WithError(writeErr).Warnf("Write returned error")
 				notClosed = false
 			}
+			if ctx.Err() != nil {
+				notClosed = false
+			}
 			c.inst.ConnectionProgressed(c.id, c.alias, c.direction, m)
 
 			if time.Since(t0) > c.delay && c.throttle && c.rate > 0 {
@@ -328,7 +333,11 @@ func (c *connection) handleConnection() {
 					waitTime = 0
 				}
 				c.inst.ConnectionDelayed(c.id, c.alias, c.direction, waitTime)
-				time.Sleep(waitTime)
+				select {
+				case <-ctx.Done():
+					notClosed = false
+				case <-time.After(waitTime):
+				}
 			}
 		}
 		c.inst.ConnectionCompleted(c.id, c.alias, c.direction, bytes, time.Since(t0))
