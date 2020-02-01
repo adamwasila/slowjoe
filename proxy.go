@@ -6,7 +6,6 @@ import (
 	"io"
 	"math/rand"
 	"net"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -29,7 +28,6 @@ type Proxy struct {
 	metricsEnabled              bool
 	bindAddr                    *net.TCPAddr
 	upstreamAddr                *net.TCPAddr
-	shutdowner                  shutdowner
 	instrumentations            Instrumentations
 }
 
@@ -51,13 +49,6 @@ type proxyOption func(*Proxy) error
 func Version(version string) proxyOption {
 	return func(p *Proxy) error {
 		p.version = version
-		return nil
-	}
-}
-
-func Shutdowner(sh shutdowner) proxyOption {
-	return func(p *Proxy) error {
-		p.shutdowner = sh
 		return nil
 	}
 }
@@ -128,7 +119,7 @@ func New(options ...proxyOption) (*Proxy, error) {
 	return p, nil
 }
 
-func (p *Proxy) ListenAndLoop() error {
+func (p *Proxy) ListenAndLoop(ctx context.Context) error {
 	log := logrus.StandardLogger()
 	log.WithFields(logrus.Fields{
 		"bind":       p.bind,
@@ -141,12 +132,11 @@ func (p *Proxy) ListenAndLoop() error {
 	if err != nil {
 		return err
 	}
-	p.shutdowner.start(os.Exit)
-	p.shutdowner.register(func() {
-		ln.Close()
-	})
-
 	log.WithField("bind", p.bind).Infof("Listen on TCP socket")
+	go func() {
+		<-ctx.Done()
+		ln.Close()
+	}()
 
 	on := p.instrumentations
 
@@ -155,6 +145,10 @@ func (p *Proxy) ListenAndLoop() error {
 		if err != nil {
 			if strings.Contains(err.Error(), "use of closed network connection") {
 				return nil
+			}
+			closeErr := ln.Close()
+			if closeErr != nil {
+				logrus.WithError(err).Warnf("Error closing connection")
 			}
 			return err
 		}
@@ -199,7 +193,7 @@ func (p *Proxy) ListenAndLoop() error {
 		}
 		on.ConnectionOpened(id, name, typ)
 
-		ctx, ctxCancel := context.WithCancel(context.Background())
+		childCtx, ctxCancel := context.WithCancel(ctx)
 		once := sync.Once{}
 		connectionCloser := func() {
 			once.Do(func() {
@@ -216,22 +210,20 @@ func (p *Proxy) ListenAndLoop() error {
 				on.ConnectionClosed(id, name, time.Since(acceptedTimestamp))
 			})
 		}
-		hookID := p.shutdowner.register(connectionCloser)
 
 		if close {
 			on.ConnectionScheduledClose(id, name, p.delay)
 
 			time.AfterFunc(p.delay, func() {
 				connectionCloser()
-				p.shutdowner.unregister(hookID)
 			})
 			continue
 		}
 
 		go func() {
 			Executor(
-				Execute(
-					func() {
+				ExecuteWithContext(
+					func(ctx context.Context) {
 						c := connection{config.DirUpstream, on, id, name, typ, throttle, close, p.rate, p.delay, conn, ups}
 						c.handleConnection(ctx)
 						if p.rate != 0 {
@@ -239,7 +231,7 @@ func (p *Proxy) ListenAndLoop() error {
 							on.ConnectionClosedUpstream(id, name)
 						}
 					},
-					func() {
+					func(ctx context.Context) {
 						c := connection{config.DirDownstream, on, id, name, typ, throttle, close, p.rate, p.delay, ups, conn}
 						c.handleConnection(ctx)
 						if p.rate != 0 {
@@ -251,7 +243,6 @@ func (p *Proxy) ListenAndLoop() error {
 				WhenAllFinished(
 					func() {
 						connectionCloser()
-						p.shutdowner.unregister(hookID)
 					},
 				),
 				WhenPanic(
@@ -259,7 +250,7 @@ func (p *Proxy) ListenAndLoop() error {
 						logrus.WithField("panic", p).Fatalf("Unexpected panic")
 					},
 				),
-			).Run(ctx)
+			).Run(childCtx)
 		}()
 	}
 }

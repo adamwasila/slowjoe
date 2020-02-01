@@ -1,93 +1,53 @@
 package slowjoe
 
 import (
-	"sync/atomic"
 	"syscall"
 	"testing"
+	"time"
 
 	. "github.com/smartystreets/goconvey/convey"
 )
 
 func TestShutdowner(t *testing.T) {
-	Convey("Given shutdowner default instance and shutdown hook", t, func() {
-		s := SignalShutdowner{}
-		var hookCounter int32 = 0
-		hook := func() {
-			atomic.AddInt32(&hookCounter, 1)
+	Convey("Given shutdowner default instance and cancel function instance", t, func() {
+		cancelCalled := make(chan bool)
+		cancel := func() {
+			close(cancelCalled)
 		}
 
-		Convey("When no hook is registered and shutdown is called", func() {
-			s.callShutdownHooks()
-
-			Convey("Hook will not be called on shutdown", func() {
-				So(hookCounter, ShouldEqual, 0)
-			})
-		})
-
-		Convey("When fake hook is unregistered first and shutdown is called", func() {
-			s.unregister(0)
-			s.callShutdownHooks()
-
-			Convey("Hook will not be called on shutdown", func() {
-				So(hookCounter, ShouldEqual, 0)
-			})
-		})
-
-		Convey("When hook is registered and shutdown is called", func() {
-			s.register(hook)
-			s.callShutdownHooks()
-
-			Convey("Hook will be called on shutdown", func() {
-				So(hookCounter, ShouldEqual, 1)
-			})
-		})
-
-		Convey("When hook is registered and deregistered and shutdown is called", func() {
-			id := s.register(hook)
-			s.unregister(id)
-			s.callShutdownHooks()
-
-			Convey("Hook will not be called on shutdown", func() {
-				So(hookCounter, ShouldEqual, 0)
-			})
-		})
-
-		Convey("When hook is registered and tryExit is called twice", func() {
-			s.register(hook)
-
-			s.TryExit(func(int) {})
-			s.TryExit(func(int) {})
-
-			Convey("Shutdown hooks will be called once", func() {
-				So(hookCounter, ShouldEqual, 1)
-			})
-		})
-
 		Convey("When hook is registered and gracefull stop routine is started", func() {
-			s.register(hook)
-			s.start(func(int) {})
+			CallForSignals(cancel)
 
-			Convey("And when SIGINT signal is sent to the process and tryExit will be used to wait", func() {
+			Convey("And when SIGINT signal is sent to the process", func() {
 
 				err := syscall.Kill(syscall.Getpid(), syscall.SIGINT)
 				So(err, ShouldBeNil)
 
-				s.TryExit(func(int) {})
+				Convey("Then cancel function will be called shortly", func() {
+					result := false
+					select {
+					case <-time.After(3 * time.Second):
+						result = false
+					case <-cancelCalled:
+						result = true
 
-				Convey("Shutdown hooks will be called once", func() {
-					So(hookCounter, ShouldEqual, 1)
+					}
+					So(result, ShouldBeTrue)
 				})
 			})
 
-			Convey("And when SIGTERM signal is sent to the process and tryExit will be used to wait", func() {
+			Convey("And when SIGINT signal is NOT sent to the process", func() {
 
-				err := syscall.Kill(syscall.Getpid(), syscall.SIGINT)
-				So(err, ShouldBeNil)
+				Convey("Then cancel function will not be called", func() {
+					result := false
+					select {
+					case <-time.After(100 * time.Millisecond):
+						result = false
+					case <-cancelCalled:
+						result = true
 
-				s.TryExit(func(int) {})
-
-				Convey("Shutdown hooks will be called once", func() {
-					So(hookCounter, ShouldEqual, 1)
+					}
+					So(result, ShouldBeFalse)
 				})
 			})
 

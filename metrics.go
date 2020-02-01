@@ -4,6 +4,7 @@ import (
 	"context"
 	"expvar"
 	"fmt"
+	"net"
 	"net/http"
 	"time"
 
@@ -53,7 +54,7 @@ func (m *Metrics) ConnectionClosed(id, alias string, d time.Duration) {
 	m.connectionsTimeMetric.Add(d.Seconds())
 }
 
-func (m *Metrics) Init(adminPort int, data *admin.AdminData, sh shutdowner) {
+func (m *Metrics) Init(ctx context.Context, adminPort int, data *admin.AdminData) {
 	go func() {
 		mux := goji.NewMux()
 
@@ -62,16 +63,20 @@ func (m *Metrics) Init(adminPort int, data *admin.AdminData, sh shutdowner) {
 		admin.AddRoutes(mux, data)
 
 		logrus.WithField("port", adminPort).Infof("Start admin console")
-		server := &http.Server{Addr: fmt.Sprintf(":%d", adminPort), Handler: mux}
-		sh.register(func() {
-			err := server.Shutdown(context.Background())
-			if err != nil {
-				logrus.Errorf("Shutdown of admin console unclean: [%s]", err)
-			}
-		})
+		server := &http.Server{Addr: fmt.Sprintf(":%d", adminPort), BaseContext: func(net.Listener) context.Context { return ctx }, Handler: mux}
+
 		err := server.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
 			logrus.Infof("HTTP handler closed with error: %s", err)
+		}
+
+		<-ctx.Done()
+
+		shutdownContext, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		err = server.Shutdown(shutdownContext)
+		if err != nil {
+			logrus.Errorf("Shutdown of admin console unclean: [%s]", err)
 		}
 	}()
 	m.connectionsOpenedMetric = metric.NewCounter("30m10s")

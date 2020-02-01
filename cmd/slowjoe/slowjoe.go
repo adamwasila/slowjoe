@@ -1,8 +1,8 @@
 package main
 
 import (
+	"context"
 	"math/rand"
-	"os"
 	"time"
 
 	"github.com/adamwasila/slowjoe"
@@ -25,17 +25,20 @@ func main() {
 
 	rand.Seed(time.Now().UnixNano())
 
-	sh := slowjoe.SignalShutdowner{}
-
 	var insts slowjoe.Instrumentations
 	insts = append(insts, &slowjoe.Logs{logrus.StandardLogger()})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	slowjoe.CallForSignals(cancel)
 
 	if cfg.MetricsEnabled {
 		ad := admin.NewAdminData()
 		ad.Version = version
 		ad.Config = cfg
 		m := slowjoe.Metrics{}
-		m.Init(cfg.AdminPort, ad, &sh)
+		m.Init(ctx, cfg.AdminPort, ad)
 		insts = append(insts, ad, &m)
 	}
 
@@ -44,7 +47,6 @@ func main() {
 		slowjoe.Config(cfg),
 		slowjoe.Bind(cfg.Bind),
 		slowjoe.Upstream(cfg.Upstream),
-		slowjoe.Shutdowner(&sh),
 		slowjoe.Instrument(
 			insts,
 		),
@@ -53,9 +55,8 @@ func main() {
 		logrus.Fatal(err.Error())
 	}
 
-	err = proxy.ListenAndLoop()
+	err = proxy.ListenAndLoop(ctx)
 	if err != nil {
 		logrus.WithError(err).Infof("Main loop break. Service will quit shortly")
 	}
-	sh.TryExit(os.Exit)
 }
