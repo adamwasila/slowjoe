@@ -69,7 +69,7 @@ Finally point your browser to: <http://localhost:6000> to see current settings a
 
 ## Install
 
-Go 1.12+ should be installed in the system. While it was not tested with earlier versions of go it should work as long as you provide all required dependencies.
+Go 1.13+ should be installed in the system and version 1.13 is minimal to sucessfully compile current codebase.
 
 Download to your `GOPATH` by typing standard `go get` command:
 
