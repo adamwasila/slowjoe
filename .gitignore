@@ -2,3 +2,4 @@
 /slowjoe
 dist/
 /cmd/slowjoe/pkged.go
+/cmd/slowjoe/__debug_bin
