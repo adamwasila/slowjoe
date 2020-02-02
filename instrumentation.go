@@ -17,11 +17,6 @@ type Instrumentation interface {
 
 type Instrumentations []Instrumentation
 
-func (ci Instrumentations) Add(i Instrumentation) Instrumentations {
-	ci = append(ci, i)
-	return ci
-}
-
 func (ci Instrumentations) ConnectionOpened(id, alias, typ string) {
 	for _, i := range ci {
 		i.ConnectionOpened(id, alias, typ)
