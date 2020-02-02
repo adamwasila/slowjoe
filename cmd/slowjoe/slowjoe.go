@@ -14,6 +14,8 @@ import (
 var version string = "0.0.0-snapshot"
 
 func main() {
+	defer slowjoe.SafeQuit()
+
 	var cfg config.Config
 	cfg.Read()
 	if cfg.Verbose {
@@ -60,5 +62,4 @@ func main() {
 		logrus.WithError(err).Infof("Main loop break. Service will quit shortly")
 	}
 
-	slowjoe.SafeQuit()
 }
