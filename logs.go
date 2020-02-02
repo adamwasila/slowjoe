@@ -11,6 +11,12 @@ type Logs struct {
 	Log *logrus.Logger
 }
 
+func DefaultLogs() *Logs {
+	return &Logs{
+		Log: logrus.StandardLogger(),
+	}
+}
+
 func (l *Logs) ConnectionOpened(id, alias, typ string) {
 	l.Log.WithField("alias", alias).WithField("alias", alias).Debugf("New connection")
 }

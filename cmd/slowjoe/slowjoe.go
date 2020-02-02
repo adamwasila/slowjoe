@@ -26,7 +26,7 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 
 	var insts slowjoe.Instrumentations
-	insts = append(insts, &slowjoe.Logs{logrus.StandardLogger()})
+	insts = append(insts, slowjoe.DefaultLogs())
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
