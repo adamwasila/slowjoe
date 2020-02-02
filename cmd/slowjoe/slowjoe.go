@@ -24,6 +24,9 @@ func main() {
 	if cfg.VeryVerbose {
 		logrus.SetLevel(logrus.TraceLevel)
 	}
+	// do not ignore automatically upon fatal log; lets app logic decide
+	// if it should quit immediately or do some cleanup before
+	logrus.StandardLogger().ExitFunc = func(int) {}
 
 	rand.Seed(time.Now().UnixNano())
 
@@ -55,6 +58,7 @@ func main() {
 	)
 	if err != nil {
 		logrus.Fatal(err.Error())
+		return
 	}
 
 	err = proxy.ListenAndLoop(ctx)
