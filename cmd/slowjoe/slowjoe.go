@@ -15,20 +15,15 @@ var version string = "0.0.0-snapshot"
 
 func main() {
 	defer slowjoe.SafeQuit()
+	rand.Seed(time.Now().UnixNano())
 
 	var cfg config.Config
-	cfg.Read()
-	if cfg.Verbose {
-		logrus.SetLevel(logrus.DebugLevel)
+	err := cfg.Read()
+	if err != nil {
+		return
 	}
-	if cfg.VeryVerbose {
-		logrus.SetLevel(logrus.TraceLevel)
-	}
-	// do not ignore automatically upon fatal log; lets app logic decide
-	// if it should quit immediately or do some cleanup before
-	logrus.StandardLogger().ExitFunc = func(int) {}
 
-	rand.Seed(time.Now().UnixNano())
+	initLogger(cfg.Verbose, cfg.VeryVerbose)
 
 	var insts slowjoe.Instrumentations
 	insts = append(insts, slowjoe.DefaultLogs())
@@ -66,4 +61,16 @@ func main() {
 		logrus.WithError(err).Infof("Main loop break. Service will quit shortly")
 	}
 
+}
+
+func initLogger(verbose, veryVerbose bool) {
+	if verbose {
+		logrus.SetLevel(logrus.DebugLevel)
+	}
+	if veryVerbose {
+		logrus.SetLevel(logrus.TraceLevel)
+	}
+	// do not ignore automatically upon fatal log; lets app logic decide
+	// if it should quit immediately or do some cleanup before
+	logrus.StandardLogger().ExitFunc = func(int) {}
 }
