@@ -59,4 +59,6 @@ func main() {
 	if err != nil {
 		logrus.WithError(err).Infof("Main loop break. Service will quit shortly")
 	}
+
+	slowjoe.SafeQuit()
 }

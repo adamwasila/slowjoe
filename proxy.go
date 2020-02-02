@@ -134,6 +134,7 @@ func (p *Proxy) ListenAndLoop(ctx context.Context) error {
 	}
 	log.WithField("bind", p.bind).Infof("Listen on TCP socket")
 	go func() {
+		defer StopBlocking(SafeBlock())
 		<-ctx.Done()
 		ln.Close()
 	}()
@@ -221,6 +222,7 @@ func (p *Proxy) ListenAndLoop(ctx context.Context) error {
 		}
 
 		go func() {
+			defer StopBlocking(SafeBlock())
 			Executor(
 				ExecuteWithContext(
 					func(ctx context.Context) {

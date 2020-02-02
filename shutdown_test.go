@@ -1,6 +1,7 @@
 package slowjoe
 
 import (
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -8,7 +9,7 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-func TestShutdowner(t *testing.T) {
+func TestSignalsCatch(t *testing.T) {
 	Convey("Given shutdowner default instance and cancel function instance", t, func() {
 		cancelCalled := make(chan bool)
 		cancel := func() {
@@ -51,6 +52,36 @@ func TestShutdowner(t *testing.T) {
 				})
 			})
 
+		})
+
+	})
+}
+
+func TestSafeQuit(t *testing.T) {
+	Convey("Given two types of safeguarded functions with parametrized sleep time", t, func() {
+		var counter int32
+		f := func(i int) {
+			defer atomic.AddInt32(&counter, 1)
+			defer StopBlocking(SafeBlock())
+			time.Sleep(time.Duration(i) * time.Millisecond)
+		}
+
+		Convey("When 100 goroutines runs calling that function with duration from 1 to 100ms", func() {
+			t0 := time.Now()
+
+			for i := 1; i <= 100; i++ {
+				go f(i)
+			}
+
+			SafeQuit()
+
+			duration := time.Since(t0)
+
+			Convey("SafeQuit won't return in less than 100ms and all goroutines completes until that time", func() {
+				So(counter, ShouldEqual, 100)
+				So(duration, ShouldBeGreaterThan, 100*time.Millisecond)
+
+			})
 		})
 
 	})
