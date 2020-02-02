@@ -3,13 +3,10 @@ package slowjoe
 import (
 	"testing"
 
-	"github.com/sirupsen/logrus"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
 func TestProxyCreation(t *testing.T) {
-	presetup()
-
 	Convey("Given default configuration", t, func() {
 
 		version := "1.2.3"
@@ -27,9 +24,4 @@ func TestProxyCreation(t *testing.T) {
 		})
 
 	})
-}
-
-func presetup() {
-	//important! this setup may not fail
-	logrus.StandardLogger().ExitFunc = func(int) {}
 }
