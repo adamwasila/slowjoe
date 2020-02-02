@@ -2,6 +2,8 @@ package slowjoe
 
 import "time"
 
+// Instrumentation is interface of hooks called by main application logic
+// to support decoupled and pluggable logging, metrics, tracing etc.
 type Instrumentation interface {
 	ConnectionOpened(id, alias, typ string)
 	ConnectionProgressed(id, alias, direction string, transferredBytes int)

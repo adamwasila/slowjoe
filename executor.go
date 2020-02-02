@@ -34,6 +34,9 @@ func Execute(jobs ...func()) func(*executor) {
 	}
 }
 
+// ExecuteWithContext wraps list of plain, argumentless funtions to be independent jobs
+// to be executed concurrently; additional context argument allows job to monitor
+// cancellation signals from outside.
 func ExecuteWithContext(jobs ...func(context.Context)) func(*executor) {
 	return func(e *executor) {
 		e.intJobs = append(e.intJobs, jobs...)
