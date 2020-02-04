@@ -27,7 +27,7 @@ a:active {
 .grid-container {
     display: grid;
     grid-template-columns: 240px 1fr;
-    grid-template-rows: 50px 1fr 50px;
+    grid-template-rows: 3em 1fr 1.5em;
     grid-template-areas:
         "sidenav header"
         "sidenav main"
@@ -42,6 +42,10 @@ a:active {
     justify-content: space-between;
     padding: 0 16px;
     background-color: #8c8c8c;
+}
+
+.footer {
+    font-size: 80%;
 }
 
 .header {
