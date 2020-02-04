@@ -63,6 +63,7 @@ func AddRoutes(mux *goji.Mux, data *AdminData) {
 	mux.Handle(pat.Get("/favicon.ico"), Assets())
 	mux.Handle(pat.Get("/admin/connections.html"), ForTemplate("connections.html", data))
 	mux.Handle(pat.Get("/admin/settings.html"), ForTemplate("settings.html", data))
+	mux.Handle(pat.Get("/admin/connections"), ForTemplate("cards.html", data))
 	mux.Handle(pat.Get("/*"), Assets())
 }
 
