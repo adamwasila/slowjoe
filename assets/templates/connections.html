@@ -3,6 +3,12 @@
     $(document).ready(function(){
       setInterval(reload, 1000);
       function reload(){
+        $.get('connections/active', function(data) {
+            $("#connections-active").html(data);
+        });
+        $.get('connections/total', function(data) {
+            $("#connections-total").html(data);
+        });
         $.get('connections', function(data) {
             $("#main-cards").html(data);
         });
@@ -11,11 +17,9 @@
 </script>
 <main class="main">
     <div class="main-overview">
-        <div class="overviewcard">
-            Total: {{.admin.ConnectionsTotal}}
+        <div id="connections-total" class="overviewcard">
         </div>
-        <div class="overviewcard">
-            Active: {{.admin.ConnectionsActive}}
+        <div id="connections-active" class="overviewcard">
         </div>
     </div>
     <div class="main-cards" id="main-cards">
