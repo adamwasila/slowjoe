@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/adamwasila/slowjoe/config"
+	svg "github.com/ajstarks/svgo"
 	"github.com/markbates/pkger"
 	"github.com/sirupsen/logrus"
 	"goji.io"
@@ -61,6 +62,7 @@ func parseTemplates() (*template.Template, error) {
 func AddRoutes(mux *goji.Mux, data *AdminData) {
 	mux.Handle(pat.Get("/"), Redirect())
 	mux.Handle(pat.Get("/favicon.ico"), Assets())
+	mux.Handle(pat.Get("/img.svg"), Svg())
 	mux.Handle(pat.Get("/admin/connections.html"), ForTemplate("connections.html", data))
 	mux.Handle(pat.Get("/admin/settings.html"), ForTemplate("settings.html", data))
 	mux.Handle(pat.Get("/*"), Assets())
@@ -235,4 +237,44 @@ func (a *AdminData) RLock() {
 
 func (a *AdminData) RUnlock() {
 	a.lock.RUnlock()
+}
+
+func Svg() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/svg+xml")
+		// s := svg.New(w)
+		// s.Start(1000, 700)
+		// colors := []string{"black", "blue", "yellow", "red", "green"}
+
+		// for j := 0; j < 2; j++ {
+		// 	for _, c := range colors {
+		// 		oldx := 350
+		// 		for i := 1; i < 1000; i++ {
+		// 			y := rand.Intn(3) - 1
+		// 			s.Line(i-1, oldx, i, oldx+y, "stroke:"+c)
+		// 			oldx += y
+		// 		}
+		// 	}
+		// }
+
+		width, height := 500, 500
+		rsize := 100
+		csize := rsize / 2
+		duration := 5.0
+		repeat := 5
+		imw, imh := 100, 144
+		canvas := svg.New(w)
+		canvas.Start(width, height)
+		canvas.Circle(csize, csize, csize, `fill="red"`, `id="circle"`)
+		canvas.Image((width/2)-(imw/2), 0, imw, imh, "gopher.jpg", `id="gopher"`)
+		canvas.Square(width-rsize, 0, rsize, `fill="blue"`, `id="square"`)
+		canvas.Animate("#circle", "cx", 0, width, duration, repeat)
+		canvas.Animate("#circle", "cy", 0, height, duration, repeat)
+		canvas.Animate("#square", "x", width, 0, duration, repeat)
+		canvas.Animate("#square", "y", height, 0, duration, repeat)
+		canvas.Animate("#gopher", "y", 0, height, duration, repeat)
+		canvas.End()
+
+		// s.End()
+	}
 }
