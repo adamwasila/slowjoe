@@ -1,7 +1,6 @@
 {{template "BEGIN" .}}
 <script>
     $(document).ready(function(){
-      setInterval(reload, 1000);
       function reload(){
         $.get('connections/active', function(data) {
             $("#connections-active").html(data);
@@ -13,6 +12,22 @@
             $("#main-cards").html(data);
         });
       }
+      reload()
+
+      var timer = -1
+      function setTimer() {
+        timeout = $('#reload').find("option:selected").val() * 1000
+        timeout = isNaN(timeout) ? 0 : timeout
+        if (timer != -1) {
+            clearTimeout(timer)
+        }
+        if (timeout > 0) {
+            timer = setInterval(reload, timeout)
+        }
+      }
+      setTimer()
+
+      $('#reload').on('change', function(e){ setTimer()});
     });
 </script>
 <main class="main">
