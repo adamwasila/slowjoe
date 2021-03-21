@@ -1,17 +1,16 @@
 package admin
 
 import (
+	"embed"
 	"html/template"
-	"io/ioutil"
+	"io/fs"
 	"net/http"
-	"os"
 	"path"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/adamwasila/slowjoe/config"
-	"github.com/markbates/pkger"
 	"github.com/sirupsen/logrus"
 	"goji.io"
 	"goji.io/pat"
@@ -19,34 +18,25 @@ import (
 	humanize "github.com/dustin/go-humanize"
 )
 
-func getAsset(filename string) (string, error) {
-	f, err := pkger.Open(filename)
-	if err != nil {
-		return "", err
-	}
-	defer f.Close()
-	b, err := ioutil.ReadAll(f)
-	if err != nil {
-		return "", err
-	}
-	return string(b), nil
-}
+//go:embed assets/templates/*
+var templates embed.FS
 
 func parseTemplates() (*template.Template, error) {
 	var t *template.Template = template.New("")
-	err := pkger.Walk("/assets/templates", func(fpath string, info os.FileInfo, ierr error) error {
+
+	err := fs.WalkDir(templates, "assets/templates", func(fpath string, d fs.DirEntry, ierr error) error {
 		if ierr != nil {
 			return ierr
 		}
-		if info.IsDir() {
+		if d.IsDir() {
 			return nil
 		}
 		name := path.Base(fpath)
-		content, err := getAsset(fpath)
+		content, err := fs.ReadFile(templates, fpath)
 		if err != nil {
 			return err
 		}
-		t, err = t.New(name).Parse(content)
+		t, err = t.New(name).Parse(string(content))
 		if err != nil {
 			return err
 		}
@@ -69,8 +59,12 @@ func AddRoutes(mux *goji.Mux, data *AdminData) {
 	mux.Handle(pat.Get("/*"), Assets())
 }
 
+//go:embed assets/data/*
+var assets embed.FS
+
 func Assets() http.HandlerFunc {
-	fh := http.FileServer(pkger.Dir("/assets/data"))
+	dataFs, _ := fs.Sub(assets, "assets/data")
+	fh := http.FileServer(http.FS(dataFs))
 	return func(w http.ResponseWriter, r *http.Request) {
 		fh.ServeHTTP(w, r)
 	}
