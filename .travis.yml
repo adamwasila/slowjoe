@@ -1,6 +1,6 @@
 language: go
 go:
- - "1.13"
+ - "1.16"
 after_success:
  - go get github.com/mattn/goveralls
  - "go test -v -covermode=count -coverprofile=coverage.out"
