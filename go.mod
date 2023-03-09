@@ -3,15 +3,15 @@ module github.com/adamwasila/slowjoe
 go 1.16
 
 require (
-	github.com/dustin/go-humanize v1.0.0
-	github.com/google/uuid v1.2.0
-	github.com/gopherjs/gopherjs v0.0.0-20210202160940-bed99a852dfe // indirect
-	github.com/sirupsen/logrus v1.8.1
-	github.com/smartystreets/assertions v1.2.0 // indirect
-	github.com/smartystreets/goconvey v1.6.4
+	github.com/dustin/go-humanize v1.0.1
+	github.com/google/uuid v1.3.0
+	github.com/gopherjs/gopherjs v1.17.2 // indirect
+	github.com/sirupsen/logrus v1.9.0
+	github.com/smartystreets/assertions v1.13.0 // indirect
+	github.com/smartystreets/goconvey v1.7.2
 	github.com/spf13/pflag v1.0.5
-	github.com/stretchr/testify v1.7.0 // indirect
+	github.com/stretchr/testify v1.8.2 // indirect
 	github.com/zserge/metric v0.1.0
 	goji.io v2.0.2+incompatible
-	golang.org/x/sys v0.0.0-20210320140829-1e4c9ba3b0c4 // indirect
+	golang.org/x/sys v0.6.0 // indirect
 )
