@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/adamwasila/slowjoe/admin"
+	"github.com/oklog/run"
 	"github.com/sirupsen/logrus"
 	"github.com/zserge/metric"
 	"goji.io"
@@ -54,32 +55,28 @@ func (m *Metrics) ConnectionClosed(id, alias string, d time.Duration) {
 	m.connectionsTimeMetric.Add(d.Seconds())
 }
 
-func (m *Metrics) Init(ctx context.Context, adminPort int, data *admin.AdminData) {
+func (m *Metrics) Init(ctx context.Context, g *run.Group, adminPort int, data *admin.AdminData) {
 	mux := goji.NewMux()
 	mux.Handle(pat.Get("/debug/metrics"), metric.Handler(metric.Exposed))
 	admin.AddRoutes(mux, data)
 	server := &http.Server{Addr: fmt.Sprintf(":%d", adminPort), BaseContext: func(net.Listener) context.Context { return ctx }, Handler: mux}
 
-	go func() {
-		defer StopBlocking(SafeBlock())
+	g.Add(func() error {
 		logrus.WithField("port", adminPort).Infof("Start admin console")
 
 		err := server.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
 			logrus.Infof("HTTP handler closed with error: %s", err)
 		}
-	}()
-
-	go func() {
-		defer StopBlocking(SafeBlock())
-		<-ctx.Done()
+		return nil
+	}, func(error) {
 		shutdownContext, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 		err := server.Shutdown(shutdownContext)
 		if err != nil {
 			logrus.Errorf("Shutdown of admin console unclean: [%s]", err)
 		}
-	}()
+	})
 
 	m.connectionsOpenedMetric = metric.NewCounter("30m10s")
 	m.connectionsClosedMetric = metric.NewCounter("30m10s")

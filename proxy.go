@@ -13,6 +13,7 @@ import (
 	_ "expvar"
 
 	"github.com/google/uuid"
+	"github.com/oklog/run"
 	"github.com/sirupsen/logrus"
 
 	"github.com/adamwasila/slowjoe/config"
@@ -119,7 +120,7 @@ func New(options ...proxyOption) (*Proxy, error) {
 	return p, nil
 }
 
-func (p *Proxy) ListenAndLoop(ctx context.Context) error {
+func (p *Proxy) Listen(ctx context.Context, g *run.Group) error {
 	log := logrus.StandardLogger()
 	log.WithFields(logrus.Fields{
 		"bind":       p.bind,
@@ -133,128 +134,130 @@ func (p *Proxy) ListenAndLoop(ctx context.Context) error {
 		return err
 	}
 	log.WithField("bind", p.bind).Infof("Listen on TCP socket")
-	go func() {
-		defer StopBlocking(SafeBlock())
-		<-ctx.Done()
-		ln.Close()
-	}()
 
 	on := p.instrumentations
 
-	for {
-		conn, err := ln.AcceptTCP()
-		if err != nil {
-			if strings.Contains(err.Error(), "use of closed network connection") {
-				return nil
-			}
-			closeErr := ln.Close()
-			if closeErr != nil {
-				logrus.WithError(err).Warnf("Error closing connection")
-			}
-			return err
-		}
-		acceptedTimestamp := time.Now()
+	ctx, cancel := context.WithCancel(ctx)
 
-		chance := rand.Float64()
-
-		close := chance < p.closeChance
-		throttle := chance >= p.closeChance && chance < p.throttleChance
-
-		var id, name string
-
-		id = uuid.New().String()
-
-		switch {
-		case close:
-			name = randomC()
-		case throttle:
-			name = randomT()
-		default:
-			name = randomR()
-		}
-
-		typ := "regular"
-
-		if close {
-			typ = "closing"
-		}
-
-		if throttle {
-			typ = "throttling"
-		}
-
-		ups, err := net.DialTCP("tcp", nil, p.upstreamAddr)
-		if err != nil {
-			logrus.WithError(err).Errorf("Could not connect to upstream")
-			err := conn.Close()
+	g.Add(func() error {
+		for {
+			conn, err := ln.AcceptTCP()
 			if err != nil {
-				logrus.WithError(err).Warnf("Error closing source connection")
+				if strings.Contains(err.Error(), "use of closed network connection") {
+					return nil
+				}
+				closeErr := ln.Close()
+				if closeErr != nil {
+					logrus.WithError(err).Warnf("Error closing connection")
+				}
+				return err
 			}
-			continue
-		}
-		on.ConnectionOpened(id, name, typ)
+			acceptedTimestamp := time.Now()
 
-		childCtx, ctxCancel := context.WithCancel(ctx)
-		once := sync.Once{}
-		connectionCloser := func() {
-			once.Do(func() {
-				log := logrus.WithField("alias", name)
+			chance := rand.Float64()
+
+			close := chance < p.closeChance
+			throttle := chance >= p.closeChance && chance < p.throttleChance
+
+			var id, name string
+
+			id = uuid.New().String()
+
+			switch {
+			case close:
+				name = randomC()
+			case throttle:
+				name = randomT()
+			default:
+				name = randomR()
+			}
+
+			typ := "regular"
+
+			if close {
+				typ = "closing"
+			}
+
+			if throttle {
+				typ = "throttling"
+			}
+
+			ups, err := net.DialTCP("tcp", nil, p.upstreamAddr)
+			if err != nil {
+				logrus.WithError(err).Errorf("Could not connect to upstream")
 				err := conn.Close()
 				if err != nil {
-					log.WithError(err).Debugf("Error while closing connection")
+					logrus.WithError(err).Warnf("Error closing source connection")
 				}
-				err = ups.Close()
-				if err != nil {
-					log.WithError(err).Warnf("Error while closing connection")
-				}
-				ctxCancel()
-				on.ConnectionClosed(id, name, time.Since(acceptedTimestamp))
-			})
+				continue
+			}
+			on.ConnectionOpened(id, name, typ)
+
+			childCtx, ctxCancel := context.WithCancel(ctx)
+			once := sync.Once{}
+			connectionCloser := func() {
+				once.Do(func() {
+					log := logrus.WithField("alias", name)
+					err := conn.Close()
+					if err != nil {
+						log.WithError(err).Debugf("Error while closing connection")
+					}
+					err = ups.Close()
+					if err != nil {
+						log.WithError(err).Warnf("Error while closing connection")
+					}
+					ctxCancel()
+					on.ConnectionClosed(id, name, time.Since(acceptedTimestamp))
+				})
+			}
+
+			if close {
+				on.ConnectionScheduledClose(id, name, p.delay)
+
+				time.AfterFunc(p.delay, func() {
+					connectionCloser()
+				})
+				continue
+			}
+
+			go func() {
+				Executor(
+					ExecuteWithContext(
+						func(ctx context.Context) {
+							c := connection{config.DirUpstream, on, id, name, typ, throttle, close, p.rate, p.delay, conn, ups}
+							c.handleConnection(ctx)
+							if p.rate != 0 {
+								c.closeSingleSide()
+								on.ConnectionClosedUpstream(id, name)
+							}
+						},
+						func(ctx context.Context) {
+							c := connection{config.DirDownstream, on, id, name, typ, throttle, close, p.rate, p.delay, ups, conn}
+							c.handleConnection(ctx)
+							if p.rate != 0 {
+								c.closeSingleSide()
+								on.ConnectionClosedDownstream(id, name)
+							}
+						},
+					),
+					WhenAllFinished(
+						func() {
+							connectionCloser()
+						},
+					),
+					WhenPanic(
+						func(p interface{}) {
+							logrus.WithField("panic", p).Fatalf("Unexpected panic")
+						},
+					),
+				).Run(childCtx)
+			}()
 		}
-
-		if close {
-			on.ConnectionScheduledClose(id, name, p.delay)
-
-			time.AfterFunc(p.delay, func() {
-				connectionCloser()
-			})
-			continue
-		}
-
-		go func() {
-			defer StopBlocking(SafeBlock())
-			Executor(
-				ExecuteWithContext(
-					func(ctx context.Context) {
-						c := connection{config.DirUpstream, on, id, name, typ, throttle, close, p.rate, p.delay, conn, ups}
-						c.handleConnection(ctx)
-						if p.rate != 0 {
-							c.closeSingleSide()
-							on.ConnectionClosedUpstream(id, name)
-						}
-					},
-					func(ctx context.Context) {
-						c := connection{config.DirDownstream, on, id, name, typ, throttle, close, p.rate, p.delay, ups, conn}
-						c.handleConnection(ctx)
-						if p.rate != 0 {
-							c.closeSingleSide()
-							on.ConnectionClosedDownstream(id, name)
-						}
-					},
-				),
-				WhenAllFinished(
-					func() {
-						connectionCloser()
-					},
-				),
-				WhenPanic(
-					func(p interface{}) {
-						logrus.WithField("panic", p).Fatalf("Unexpected panic")
-					},
-				),
-			).Run(childCtx)
-		}()
-	}
+	}, func(error) {
+		ln.Close()
+		cancel()
+	})
+	return nil
 }
 
 func (c *connection) calcBufSize(inThrottle bool) int {

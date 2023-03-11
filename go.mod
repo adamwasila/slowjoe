@@ -15,6 +15,7 @@ require (
 require (
 	github.com/gopherjs/gopherjs v1.17.2 // indirect
 	github.com/jtolds/gls v4.20.0+incompatible // indirect
+	github.com/oklog/run v1.1.0 // indirect
 	github.com/smartystreets/assertions v1.13.0 // indirect
 	github.com/stretchr/testify v1.8.2 // indirect
 	golang.org/x/sys v0.6.0 // indirect
