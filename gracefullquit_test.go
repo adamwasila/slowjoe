@@ -16,7 +16,8 @@ func TestSignalsCatch(t *testing.T) {
 		}
 
 		Convey("When hook is registered and gracefull stop routine is started", func() {
-			SetSignalCallback(cancel)
+			wait, _ := SetSignalCallback(cancel)
+			go wait()
 
 			Convey("And when SIGINT signal is sent to the process", func() {
 

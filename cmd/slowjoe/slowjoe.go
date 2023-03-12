@@ -30,9 +30,16 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	slowjoe.SetSignalCallback(cancel)
+	signalWait, signalCancel := slowjoe.SetSignalCallback(cancel)
 
 	g := run.Group{}
+
+	g.Add(func() error {
+		signalWait()
+		return nil
+	}, func(error) {
+		signalCancel()
+	})
 
 	if cfg.MetricsEnabled {
 		ad := admin.NewAdminData()
