@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"math/rand"
-	"time"
 
 	"github.com/adamwasila/slowjoe"
 	"github.com/adamwasila/slowjoe/admin"
@@ -15,7 +13,6 @@ import (
 var version string = "0.0.0-snapshot"
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
 	var cfg config.Config
 	err := cfg.Read()
 	if err != nil {
