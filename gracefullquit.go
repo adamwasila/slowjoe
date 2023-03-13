@@ -16,10 +16,10 @@ import (
 // second one is cancelling waiting for signal; callback won't be called.
 func SetSignalCallback(callOnSignal func()) (wait, cancel func()) {
 	cancelChan := make(chan struct{})
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, syscall.SIGTERM, syscall.SIGINT)
 
 	wait = func() {
-		signalChan := make(chan os.Signal, 1)
-		signal.Notify(signalChan, syscall.SIGTERM, syscall.SIGINT)
 		select {
 		case sig := <-signalChan:
 			logrus.Infof("Caught signal: %+v", sig)
