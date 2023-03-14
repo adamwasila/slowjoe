@@ -57,6 +57,7 @@ func Version(version string) proxyOption {
 func Bind(bindAddress string) proxyOption {
 	return func(p *Proxy) error {
 		addr, err := net.ResolveTCPAddr("tcp", bindAddress)
+		p.bind = bindAddress
 		p.bindAddr = addr
 		return err
 	}
@@ -65,6 +66,7 @@ func Bind(bindAddress string) proxyOption {
 func Upstream(upstreamAddress string) proxyOption {
 	return func(p *Proxy) error {
 		addr, err := net.ResolveTCPAddr("tcp", upstreamAddress)
+		p.upstream = upstreamAddress
 		p.upstreamAddr = addr
 		return err
 	}
