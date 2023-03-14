@@ -54,24 +54,6 @@ func Version(version string) proxyOption {
 	}
 }
 
-func Bind(bindAddress string) proxyOption {
-	return func(p *Proxy) error {
-		addr, err := net.ResolveTCPAddr("tcp", bindAddress)
-		p.bind = bindAddress
-		p.bindAddr = addr
-		return err
-	}
-}
-
-func Upstream(upstreamAddress string) proxyOption {
-	return func(p *Proxy) error {
-		addr, err := net.ResolveTCPAddr("tcp", upstreamAddress)
-		p.upstream = upstreamAddress
-		p.upstreamAddr = addr
-		return err
-	}
-}
-
 func Config(cfg config.Config) proxyOption {
 	return func(p *Proxy) error {
 		close := cfg.CloseChance
@@ -93,8 +75,19 @@ func Config(cfg config.Config) proxyOption {
 		p.closeChance = close
 		p.rate = cfg.Rate
 
+		addr, err := net.ResolveTCPAddr("tcp", cfg.Bind)
+		if err != nil {
+			return err
+		}
 		p.bind = cfg.Bind
+		p.bindAddr = addr
+
+		addrUpstream, err := net.ResolveTCPAddr("tcp", cfg.Upstream)
+		if err != nil {
+			return err
+		}
 		p.upstream = cfg.Upstream
+		p.upstreamAddr = addrUpstream
 
 		p.delay = cfg.Delay
 		p.metricsEnabled = cfg.MetricsEnabled

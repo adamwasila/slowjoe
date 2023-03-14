@@ -50,8 +50,6 @@ func main() {
 	proxy, err := slowjoe.New(
 		slowjoe.Version(version),
 		slowjoe.Config(cfg),
-		slowjoe.Bind(cfg.Bind),
-		slowjoe.Upstream(cfg.Upstream),
 		slowjoe.Instrument(
 			insts,
 		),
