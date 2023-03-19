@@ -59,15 +59,23 @@ func Config(cfg config.Config) proxyOption {
 		close := cfg.CloseChance
 		throttle := close + cfg.ThrottleChance
 
-		if throttle < 0.0 || close < 0.0 {
-			return errors.New("Invalid config; chances must be >= 0")
+		if throttle < 0.0 {
+			return errors.New("Invalid config; throttle probability must be >= 0")
 		}
 
-		if throttle > 1.0 || close > 1.0 {
-			return errors.New("Invalid config; sum of all chances must be <= 1.0")
+		if close < 0.0 {
+			return errors.New("Invalid config; close probability must be >= 0")
 		}
 
-		if cfg.Rate < -1 {
+		if throttle > 1.0 {
+			return errors.New("Invalid config; throttle probability must be <= 1.0")
+		}
+
+		if close > 1.0 {
+			return errors.New("Invalid config; close probability must be <= 1.0")
+		}
+
+		if cfg.Rate < 0 && cfg.Rate != -1 {
 			return errors.New("Invalid config; rate must be >= 0 or -1 for unlimited")
 		}
 
