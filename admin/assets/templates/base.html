@@ -6,9 +6,28 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width">
     <link rel="stylesheet" type="text/css" href="/style.css">
-    <script src="../jquery-3.4.1.min.js"></script>
+    <script src="/htmx-1.9.12.js"></script>
+    <script src="/surreal-1.1.8.js"></script>    
+    <script src="/pollinator-0.3.2.js"></script>
 </head>
-<body>
+<body id="body">
+    <script>
+        let b = me()
+        function startPolling(delay) {
+            const { Status, Event } = Pollinator
+            if (typeof poller != 'undefined') {
+                poller.stop()
+            }
+            if (delay > 0) {
+                poller = new Pollinator(function() {                    
+                }, { delay : delay })
+                poller.on(Event.POLL, function(val) {
+                    htmx.trigger('body', 'poll')
+                })
+                poller.start()
+            }
+        }
+    </script>
     <div class="grid-container">
         <header class="header">
             <h1><a href="https://github.com/adamwasila/slowjoe">Slow Joe</a></h1>
@@ -16,12 +35,21 @@
             ⟳
             <select id="reload">
                 <option value="0">Off</option>
-                <option value="1">1s</option>
+                <option value="1" selected="selected">1s</option>
                 <option value="5">5s</option>
                 <option value="10">10s</option>
                 <option value="30">30s</option>
                 <option value="60">1m</option>
-              </select>
+                <script>
+                    let s = me()
+                    onloadAdd(()=>{
+                        startPolling(s.value * 1000)
+                    })
+                    me().on("change", ev => {                        
+                        startPolling(me(ev).value * 1000)
+                    })
+                </script>
+            </select>
             </span>
         </header>
         <aside class="sidenav">

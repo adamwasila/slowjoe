@@ -1,43 +1,18 @@
 {{template "BEGIN" .}}
-<script>
-    $(document).ready(function(){
-      function reload(){
-        $.get('connections/active', function(data) {
-            $("#connections-active").html(data);
-        });
-        $.get('connections/total', function(data) {
-            $("#connections-total").html(data);
-        });
-        $.get('connections', function(data) {
-            $("#main-cards").html(data);
-        });
-      }
-      reload()
-
-      var timer = -1
-      function setTimer() {
-        timeout = $('#reload').find("option:selected").val() * 1000
-        timeout = isNaN(timeout) ? 0 : timeout
-        if (timer != -1) {
-            clearTimeout(timer)
-        }
-        if (timeout > 0) {
-            timer = setInterval(reload, timeout)
-        }
-      }
-      setTimer()
-
-      $('#reload').on('change', function(e){ setTimer()});
-    });
-</script>
-<main class="main">
+<main id="main" class="main">
     <div class="main-overview">
-        <div id="connections-total" class="overviewcard">
-        </div>
-        <div id="connections-active" class="overviewcard">
+        <div id="connections-total" class="overviewcard"
+          hx-get="/admin/connections/total"
+          hx-trigger="poll from:body">
+        </div>   
+        <div id="connections-active" class="overviewcard"
+          hx-get="/admin/connections/active"
+          hx-trigger="poll from:body">
         </div>
     </div>
-    <div class="main-cards" id="main-cards">
-    </div>
+    <div class="main-cards" id="main-cards" 
+        hx-get="/admin/connections"
+        hx-trigger="poll from:body">
+      </div>
 </main>
 {{template "END" .}}
