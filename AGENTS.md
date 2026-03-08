@@ -102,10 +102,11 @@ Web interface providing:
 - Real-time list of active connections
 - Connection statistics (duration, bytes transferred, etc.)
 - Settings viewer
-- Dashboard templates and frontend libraries
-  - [HTMX](https://github.com/bigskysoftware/htmx)
-  - [surreal](https://github.com/gnat/surreal)
-  - [pollinator](https://github.com/inspmoore/pollinator)
+- Dashboard templates and frontend libraries:
+  - [HTMX](https://github.com/bigskysoftware/htmx) - Dynamic HTML updates
+  - [surreal](https://github.com/gnat/surreal) - Lightweight DOM library
+  - [pollinator](https://github.com/inspmoore/pollinator) - Polling utility
+  - [Bootstrap 5.3.3](https://github.com/twbs/bootstrap) - Responsive CSS framework - Bootstrap 5.3.3 - Responsive CSS framework
 
 ### Executor (`executor.go`)
 

@@ -1,1 +1,9 @@
-Active: {{.admin.ConnectionsActive}}
+<div class="metric-card card border-0 shadow-sm h-100">
+	<div class="card-body d-flex align-items-center justify-content-between">
+		<div>
+			<div class="metric-card__label">Active connections</div>
+			<div class="metric-card__value">{{.admin.ConnectionsActive}}</div>
+		</div>
+		<span class="badge text-bg-success">Live</span>
+	</div>
+</div>

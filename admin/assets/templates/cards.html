@@ -1,16 +1,25 @@
 {{range .admin.Connections}}
-<div class="card {{.Type}}">
-    <div class="cardcontent">
-        <div class="card__name">{{.Name}}</div>
-        <div class="card__alias">{{.Alias}}</div>
-        {{if .Started}}
-        <div class="card__started">Opened: {{.Since}}</div>
-        {{end}}
-        {{if .Finished}}
-        <div class="card__finished">Closed: {{.Until}}</div>
-        {{end}}
-        <div class="card__upstream">Upstream: {{.BytesSentUpstream}}</div>
-        <div class="card__downstream">Downstream: {{.BytesSentDownstream}}</div>
+<div class="card {{.Type}} shadow-sm border-0">
+    <div class="cardcontent card-body">
+        <div class="d-flex align-items-start justify-content-between gap-2 mb-2">
+            <div>
+                <div class="card__alias">{{.Alias}}</div>
+                <div class="card__name">{{.Name}}</div>
+            </div>
+            <span class="badge card__type">{{.Type}}</span>
+        </div>
+        <div class="card__times mb-3">
+            {{if .Started}}
+            <div class="card__started">Opened: {{.Since}}</div>
+            {{end}}
+            {{if .Finished}}
+            <div class="card__finished">Closed: {{.Until}}</div>
+            {{end}}
+        </div>
+        <div class="card__stats d-flex justify-content-between">
+            <div class="card__upstream">Upstream: {{.BytesSentUpstream}}</div>
+            <div class="card__downstream">Downstream: {{.BytesSentDownstream}}</div>
+        </div>
     </div>
 </div>
 {{end}}

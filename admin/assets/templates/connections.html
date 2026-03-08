@@ -1,11 +1,11 @@
 {{template "BEGIN" .}}
 <main id="main" class="main">
-    <div class="main-overview">
-        <div id="connections-total" class="overviewcard"
+    <div class="main-overview row g-3 mb-3">
+        <div id="connections-total" class="overviewcard col-12 col-xl-6"
           hx-get="/admin/connections/total"
           hx-trigger="poll from:body">
         </div>   
-        <div id="connections-active" class="overviewcard"
+        <div id="connections-active" class="overviewcard col-12 col-xl-6"
           hx-get="/admin/connections/active"
           hx-trigger="poll from:body">
         </div>
