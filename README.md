@@ -6,7 +6,7 @@
 
 Simple TCP proxy to test your services for poor network conditions.
 
-Simplicity is the most important aspect. No one wants to spend hours looking for dependencies then learning yet another DSL or quirks of config file, right? Downloading single, static binary (see [releases](../releases/latest) for that) and reading description of [few flags](#configuration) is all you need to start. Being docker aficionado makes things even simpler: all burden is to call `docker run` as [service image is available on docker hub](https://hub.docker.com/r/adamwasila/slowjoe).
+Simplicity is the most important aspect. No one wants to spend hours looking for dependencies, then learning yet another DSL or the quirks of a config file, right? Downloading a single, static binary (see [releases](../releases/latest)) and reading the description of a [few flags](#configuration) is all you need to start. Being a Docker aficionado makes things even simpler: all you need is to run `docker run`, as the [service image is available on Docker Hub](https://hub.docker.com/r/adamwasila/slowjoe).
 
 > **WARNING**: unstable product. API, configuration and behaviour may and will change without a warning.
 
@@ -25,7 +25,7 @@ Otherwise, go to [releases subpage](../releases/latest) and download latest vers
 
 Last option is to build on your own. See [Install](#install) section below for details.
 
-Having binary in PATH you may try following examples. First, run less trivial example where `slowjoe` works as a proxy to [httpbin service](httpbin.org). Lets assume that 10% of requests should have throughput limited to 1kb/s.
+With the binary in your `PATH`, you may try the following examples. First, run a less trivial example where `slowjoe` works as a proxy to the [httpbin service](httpbin.org). Let's assume that 10% of requests should have throughput limited to 1kb/s.
 
 ```bash
 slowjoe -a -u "httpbin.org:80" -t 0.1 -r 1024
@@ -45,7 +45,7 @@ curl http://localhost:9998/headers
 }
 ```
 
-Now hit the following link in you browser <http://localhost:9998/image/jpeg> and experience modem-like connection speed. Welcome back the Internet of 90s.
+Now hit the following link in your browser <http://localhost:9998/image/jpeg> and experience modem-like connection speed. Welcome back to the Internet of the 90s.
 
 Next test closing immediately behaviour:
 
@@ -55,13 +55,13 @@ slowjoe -u "httpbin.org:80" -c 1.0
 
 Now, all requests should be closed without sending any data.
 
-Both behaviours may be mixed together. Here, half of connections are closed immediately and half will be throtled to 1000 bytes per second:
+Both behaviours may be mixed together. Here, half of the connections are closed immediately and half are throttled to 1000 bytes per second:
 
 ```bash
 slowjoe -u "httpbin.org:80" -c 0.5 -t 0.5 -r 1000
 ```
 
-Finally point your browser to: <http://localhost:6000> to see current settings and list of currently opened connections:
+Finally, point your browser to <http://localhost:6000> to see current settings and a list of currently open connections:
 
 ![webdashboard](dashboard.png "Simple dashboard")
 
@@ -69,7 +69,7 @@ Finally point your browser to: <http://localhost:6000> to see current settings a
 
 ## Install
 
-Go 1.16+ should be installed in the system. Version 1.16 is minimal to sucessfully compile current codebase.
+Go 1.16+ should be installed on the system. Version 1.16 is the minimum required to successfully compile the current codebase.
 
 Download to your `GOPATH` by typing standard `go get` command:
 
@@ -77,7 +77,7 @@ Download to your `GOPATH` by typing standard `go get` command:
 go get -u github.com/adamwasila/slowjoe
 ```
 
-Alternatively, clone this repository or download latest version. There are no official, versioned releases yet so take latest commit from the master. It opts for go modules thus sources may be put outside `GOPATH` to compile just fine using regular `go build` command. If put inside `GOPATH` remember to refer to documentation of your version of go and set `GO111MODULE` variable accordingly.
+Alternatively, clone this repository or download the latest version. There are no official, versioned releases yet, so take the latest commit from master. It uses Go modules, so sources may be put outside `GOPATH` and still compile just fine using the regular `go build` command. If put inside `GOPATH`, refer to the documentation for your Go version and set the `GO111MODULE` variable accordingly.
 
 Enter repository and issue command:
 
