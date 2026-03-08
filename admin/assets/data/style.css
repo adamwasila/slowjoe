@@ -178,6 +178,46 @@ a {
     gap: 0.5rem;
 }
 
+.card__stats-bar {
+    margin-top: 0.5rem;
+}
+
+.stats-bar {
+    display: flex;
+    width: 100%;
+    height: 32px;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.stats-bar__segment {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 8px;
+    transition: all 0.3s ease;
+    min-width: 0;
+}
+
+.stats-bar__upstream {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+}
+
+.stats-bar__downstream {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.stats-bar__label {
+    color: #ffffff;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
 @media (max-width: 1100px) {
     .main-cards {
         column-count: 2;
@@ -197,4 +237,71 @@ a {
     .main-cards {
         column-count: 1;
     }
+}
+/* Table view styles */
+.table-responsive {
+    background: #ffffff;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    column-span: all;
+    -webkit-column-span: all;
+}
+
+.table-responsive table {
+    table-layout: fixed;
+    width: 100%;
+}
+
+.table-responsive td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sort-header {
+    user-select: none;
+    position: relative;
+    padding-right: 1.5rem !important;
+}
+
+.sort-header:hover {
+    background-color: #e5e7eb !important;
+}
+
+.sort-indicator {
+    opacity: 0.3;
+    font-size: 0.875rem;
+    margin-left: 0.25rem;
+}
+
+.sort-header.sort-asc .sort-indicator::before {
+    content: '↑';
+    opacity: 1;
+    font-weight: bold;
+}
+
+.sort-header.sort-desc .sort-indicator::before {
+    content: '↓';
+    opacity: 1;
+    font-weight: bold;
+}
+
+.sort-header.sort-asc .sort-indicator,
+.sort-header.sort-desc .sort-indicator {
+    opacity: 1;
+}
+
+.badge-throttling {
+    background-color: #fbbf24;
+    color: #78350f;
+}
+
+.badge-closing {
+    background-color: #ef4444;
+    color: #ffffff;
+}
+
+.badge-regular {
+    background-color: #10b981;
+    color: #ffffff;
 }

@@ -16,6 +16,46 @@
 <body id="body">
     <script>
         let b = me()
+        let currentViewMode = 'cards'
+        let currentSortColumn = null
+        let currentSortDirection = 'asc'
+        
+        function loadSortState() {
+            // Try to load from URL first
+            const urlParams = new URLSearchParams(window.location.search)
+            const urlSort = urlParams.get('sort')
+            const urlDir = urlParams.get('dir')
+            
+            if (urlSort && urlDir) {
+                currentSortColumn = urlSort
+                currentSortDirection = urlDir
+            } else {
+                // Fall back to localStorage
+                const savedSort = localStorage.getItem('sortColumn')
+                const savedDir = localStorage.getItem('sortDirection')
+                if (savedSort && savedDir) {
+                    currentSortColumn = savedSort
+                    currentSortDirection = savedDir
+                }
+            }
+        }
+        
+        function saveSortState() {
+            localStorage.setItem('sortColumn', currentSortColumn)
+            localStorage.setItem('sortDirection', currentSortDirection)
+            
+            // Update URL without reloading
+            const url = new URL(window.location)
+            if (currentSortColumn) {
+                url.searchParams.set('sort', currentSortColumn)
+                url.searchParams.set('dir', currentSortDirection)
+            } else {
+                url.searchParams.delete('sort')
+                url.searchParams.delete('dir')
+            }
+            window.history.replaceState({}, '', url)
+        }
+        
         function startPolling(delay) {
             const { Status, Event } = Pollinator
             if (typeof poller != 'undefined') {
@@ -30,6 +70,98 @@
                 poller.start()
             }
         }
+        
+        function switchViewMode(mode) {
+            currentViewMode = mode
+            updateMainCardsUrl()
+            const mainCards = document.getElementById('main-cards')
+            if (mainCards) {
+                htmx.trigger(mainCards, 'poll')
+            }
+        }
+        
+        function applySorting() {
+            if (!currentSortColumn || currentViewMode !== 'table') return
+            
+            const table = document.querySelector('#main-cards table tbody')
+            if (!table) return
+            
+            const rows = Array.from(table.querySelectorAll('tr'))
+            if (rows.length === 0) return
+            
+            rows.sort((a, b) => {
+                let aVal = a.getAttribute('data-' + currentSortColumn)
+                let bVal = b.getAttribute('data-' + currentSortColumn)
+                
+                // Convert to numbers if possible
+                const aNum = parseFloat(aVal)
+                const bNum = parseFloat(bVal)
+                if (!isNaN(aNum) && !isNaN(bNum)) {
+                    return currentSortDirection === 'asc' ? aNum - bNum : bNum - aNum
+                }
+                
+                // String comparison
+                if (currentSortDirection === 'asc') {
+                    return aVal.localeCompare(bVal)
+                } else {
+                    return bVal.localeCompare(aVal)
+                }
+            })
+            
+            table.innerHTML = ''
+            rows.forEach(row => table.appendChild(row))
+            
+            // Update sort indicators
+            document.querySelectorAll('.sort-header').forEach(header => {
+                header.classList.remove('sort-asc', 'sort-desc')
+            })
+            const activeHeader = document.querySelector(`.sort-header[data-column="${currentSortColumn}"]`)
+            if (activeHeader) {
+                activeHeader.classList.add(currentSortDirection === 'asc' ? 'sort-asc' : 'sort-desc')
+            }
+        }
+        
+        function sortTable(column) {
+            if (currentSortColumn === column) {
+                currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc'
+            } else {
+                currentSortColumn = column
+                currentSortDirection = 'asc'
+            }
+            
+            saveSortState()
+            updateMainCardsUrl()
+            applySorting()
+        }
+        
+        function updateMainCardsUrl() {
+            const mainCards = document.getElementById('main-cards')
+            if (!mainCards) return
+            
+            let url = currentViewMode === 'cards' ? '/admin/connections' : '/admin/connections/table'
+            
+            // Add sort parameters if they exist
+            if (currentSortColumn) {
+                url += `?sort=${currentSortColumn}&dir=${currentSortDirection}`
+            }
+            
+            mainCards.setAttribute('hx-get', url)
+            htmx.process(mainCards)
+        }
+        
+        // Load sort state on page load
+        onloadAdd(() => {
+            loadSortState()
+            updateMainCardsUrl()
+            applySorting()
+        })
+        
+        // Reapply sorting after HTMX content swap
+        document.body.addEventListener('htmx:afterSwap', function(evt) {
+            if (evt.detail.target.id === 'main-cards') {
+                setTimeout(() => applySorting(), 10)
+            }
+        })
     </script>
     <div class="app-shell">
         <aside class="sidenav">
@@ -52,7 +184,25 @@
                             href="https://github.com/adamwasila/slowjoe">Dashboard</a>
                     </div>
                     <div class="d-flex align-items-center gap-2">
-                        <label for="reload" class="form-label text-muted small mb-0">Auto refresh</label>
+                        <label for="viewMode" class="form-label text-muted small mb-0">View</label>
+                        <select id="viewMode" class="form-select form-select-sm">
+                            <option value="cards" selected="selected">Cards</option>
+                            <option value="table">Table</option>
+                            <script>
+                                let vm = me()
+                                onloadAdd(() => {
+                                    const saved = localStorage.getItem('viewMode') || 'cards'
+                                    vm.value = saved
+                                    switchViewMode(saved)
+                                })
+                                vm.on("change", ev => {
+                                    const mode = me(ev).value
+                                    localStorage.setItem('viewMode', mode)
+                                    switchViewMode(mode)
+                                })
+                            </script>
+                        </select>
+                        <label for="reload" class="form-label text-muted small mb-0 ms-3">Auto refresh</label>
                         <select id="reload" class="form-select form-select-sm">
                             <option value="0">Off</option>
                             <option value="1" selected="selected">1s</option>

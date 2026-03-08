@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"net/http"
 	"path"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -56,6 +57,7 @@ func AddRoutes(mux *goji.Mux, data *AdminData) {
 	mux.Handle(pat.Get("/admin/connections/total"), ForTemplate("total.html", data))
 	mux.Handle(pat.Get("/admin/connections/active"), ForTemplate("active.html", data))
 	mux.Handle(pat.Get("/admin/connections"), ForTemplate("cards.html", data))
+	mux.Handle(pat.Get("/admin/connections/table"), ForTemplate("table.html", data))
 	mux.Handle(pat.Get("/*"), Assets())
 }
 
@@ -87,6 +89,13 @@ func ForTemplate(page string, adminData *AdminData) http.HandlerFunc {
 
 		data := make(map[string]interface{})
 
+		// Extract sort parameters from query string
+		sortColumn := r.URL.Query().Get("sort")
+		sortDirection := r.URL.Query().Get("dir")
+		if sortDirection == "" {
+			sortDirection = "asc"
+		}
+
 		data["admin"] = adminData
 		ui := Ui{
 			Menu: []MenuItem{
@@ -111,6 +120,11 @@ func ForTemplate(page string, adminData *AdminData) http.HandlerFunc {
 
 		adminData.RLock()
 		defer adminData.RUnlock()
+
+		// Provide sorted connections for templates that need it
+		if page == "cards.html" || page == "table.html" {
+			data["sortedConnections"] = adminData.GetSortedConnections(sortColumn, sortDirection)
+		}
 
 		err = t.ExecuteTemplate(w, page, data)
 		if err != nil {
@@ -161,6 +175,91 @@ func (c ConnData) Until() string {
 		return "-"
 	}
 	return humanize.Time(*c.Finished)
+}
+
+func (c ConnData) BytesSentUpstreamFormatted() string {
+	return humanize.Bytes(uint64(c.BytesSentUpstream))
+}
+
+func (c ConnData) BytesSentDownstreamFormatted() string {
+	return humanize.Bytes(uint64(c.BytesSentDownstream))
+}
+
+func (c ConnData) UpstreamPercent() float64 {
+	total := c.BytesSentUpstream + c.BytesSentDownstream
+	if total == 0 {
+		return 50.0
+	}
+	return float64(c.BytesSentUpstream) / float64(total) * 100.0
+}
+
+func (c ConnData) DownstreamPercent() float64 {
+	total := c.BytesSentUpstream + c.BytesSentDownstream
+	if total == 0 {
+		return 50.0
+	}
+	return float64(c.BytesSentDownstream) / float64(total) * 100.0
+}
+
+func (c ConnData) TotalBytes() int {
+	return c.BytesSentUpstream + c.BytesSentDownstream
+}
+
+func (c ConnData) TotalBytesFormatted() string {
+	return humanize.Bytes(uint64(c.TotalBytes()))
+}
+
+func (a *AdminData) GetSortedConnections(sortColumn, sortDirection string) []ConnData {
+	// Convert map to slice
+	connections := make([]ConnData, 0, len(a.Connections))
+	for _, conn := range a.Connections {
+		connections = append(connections, conn)
+	}
+
+	// Sort based on column and direction
+	if sortColumn != "" {
+		sort.Slice(connections, func(i, j int) bool {
+			var less bool
+			switch sortColumn {
+			case "type":
+				less = connections[i].Type < connections[j].Type
+			case "opened":
+				// Handle nil Started times
+				if connections[i].Started == nil && connections[j].Started == nil {
+					less = false
+				} else if connections[i].Started == nil {
+					less = true
+				} else if connections[j].Started == nil {
+					less = false
+				} else {
+					less = connections[i].Started.Before(*connections[j].Started)
+				}
+			case "closed":
+				// Handle nil Finished times
+				if connections[i].Finished == nil && connections[j].Finished == nil {
+					less = false
+				} else if connections[i].Finished == nil {
+					less = true
+				} else if connections[j].Finished == nil {
+					less = false
+				} else {
+					less = connections[i].Finished.Before(*connections[j].Finished)
+				}
+			case "size":
+				less = connections[i].TotalBytes() < connections[j].TotalBytes()
+			default:
+				// Default sort by name
+				less = connections[i].Name < connections[j].Name
+			}
+
+			if sortDirection == "desc" {
+				return !less
+			}
+			return less
+		})
+	}
+
+	return connections
 }
 
 func NewAdminData() *AdminData {

@@ -1,4 +1,4 @@
-{{range .admin.Connections}}
+{{range .sortedConnections}}
 <div class="card {{.Type}} shadow-sm border-0">
     <div class="cardcontent card-body">
         <div class="d-flex align-items-start justify-content-between gap-2 mb-2">
@@ -16,9 +16,15 @@
             <div class="card__finished">Closed: {{.Until}}</div>
             {{end}}
         </div>
-        <div class="card__stats d-flex justify-content-between">
-            <div class="card__upstream">Upstream: {{.BytesSentUpstream}}</div>
-            <div class="card__downstream">Downstream: {{.BytesSentDownstream}}</div>
+        <div class="card__stats-bar">
+            <div class="stats-bar">
+                <div class="stats-bar__segment stats-bar__upstream" style="width: {{.UpstreamPercent}}%" title="{{.BytesSentUpstreamFormatted}} sent upstream">
+                    <span class="stats-bar__label">{{.BytesSentUpstreamFormatted}}</span>
+                </div>
+                <div class="stats-bar__segment stats-bar__downstream" style="width: {{.DownstreamPercent}}%" title="{{.BytesSentDownstreamFormatted}} sent downstream">
+                    <span class="stats-bar__label">{{.BytesSentDownstreamFormatted}}</span>
+                </div>
+            </div>
         </div>
     </div>
 </div>
