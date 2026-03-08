@@ -18,7 +18,7 @@ func DefaultLogs() *Logs {
 }
 
 func (l *Logs) ConnectionOpened(id, alias, typ string) {
-	l.Log.WithField("alias", alias).WithField("alias", alias).Debugf("New connection")
+	l.Log.WithField("id", id).WithField("alias", alias).Debugf("New connection")
 }
 
 func (l *Logs) ConnectionProgressed(id, alias, direction string, transferredBytes int) {

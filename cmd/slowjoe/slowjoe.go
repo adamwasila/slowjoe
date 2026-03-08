@@ -61,7 +61,7 @@ func main() {
 
 	err = proxy.Listen(ctx, &g)
 	if err != nil {
-		logrus.WithError(err).Infof("Failed to listen")
+		logrus.WithError(err).Errorf("Failed to listen")
 		return
 	}
 

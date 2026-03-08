@@ -6,7 +6,6 @@ import (
 	"io"
 	"math/rand"
 	"net"
-	"strings"
 	"sync"
 	"time"
 
@@ -33,16 +32,16 @@ type Proxy struct {
 }
 
 type connection struct {
-	direction       string
-	inst            Instrumentation
-	id              string
-	alias           string
-	typ             string
-	throttle, close bool
-	rate            int
-	delay           time.Duration
-	r               *net.TCPConn
-	w               *net.TCPConn
+	direction string
+	inst      Instrumentation
+	id        string
+	alias     string
+	typ       string
+	throttle  bool
+	rate      int
+	delay     time.Duration
+	r         *net.TCPConn
+	w         *net.TCPConn
 }
 
 type proxyOption func(*Proxy) error
@@ -56,31 +55,32 @@ func Version(version string) proxyOption {
 
 func Config(cfg config.Config) proxyOption {
 	return func(p *Proxy) error {
-		close := cfg.CloseChance
-		throttle := close + cfg.ThrottleChance
-
-		if throttle < 0.0 {
-			return errors.New("Invalid config; throttle probability must be >= 0")
+		if cfg.CloseChance < 0.0 {
+			return errors.New("invalid config: close probability must be >= 0")
 		}
 
-		if close < 0.0 {
-			return errors.New("Invalid config; close probability must be >= 0")
+		if cfg.CloseChance > 1.0 {
+			return errors.New("invalid config: close probability must be <= 1.0")
 		}
 
-		if throttle > 1.0 {
-			return errors.New("Invalid config; throttle probability must be <= 1.0")
+		if cfg.ThrottleChance < 0.0 {
+			return errors.New("invalid config: throttle probability must be >= 0")
 		}
 
-		if close > 1.0 {
-			return errors.New("Invalid config; close probability must be <= 1.0")
+		if cfg.ThrottleChance > 1.0 {
+			return errors.New("invalid config: throttle probability must be <= 1.0")
+		}
+
+		if cfg.CloseChance+cfg.ThrottleChance > 1.0 {
+			return errors.New("invalid config: sum of close and throttle probabilities must be <= 1.0")
 		}
 
 		if cfg.Rate < 0 && cfg.Rate != -1 {
-			return errors.New("Invalid config; rate must be >= 0 or -1 for unlimited")
+			return errors.New("invalid config: rate must be >= 0 or -1 for unlimited")
 		}
 
-		p.throttleChance = throttle
-		p.closeChance = close
+		p.closeChance = cfg.CloseChance
+		p.throttleChance = cfg.CloseChance + cfg.ThrottleChance
 		p.rate = cfg.Rate
 
 		addr, err := net.ResolveTCPAddr("tcp", cfg.Bind)
@@ -155,12 +155,8 @@ func (p *Proxy) accept(ctx context.Context, ln *net.TCPListener) error {
 	for {
 		conn, err := ln.AcceptTCP()
 		if err != nil {
-			if strings.Contains(err.Error(), "use of closed network connection") {
+			if errors.Is(err, net.ErrClosed) {
 				return nil
-			}
-			closeErr := ln.Close()
-			if closeErr != nil {
-				logrus.WithError(err).Warnf("Error closing connection")
 			}
 			return err
 		}
@@ -168,30 +164,22 @@ func (p *Proxy) accept(ctx context.Context, ln *net.TCPListener) error {
 
 		chance := rand.Float64()
 
-		close := chance < p.closeChance
+		shouldClose := chance < p.closeChance
 		throttle := chance >= p.closeChance && chance < p.throttleChance
 
-		var id, name string
+		id := uuid.New().String()
 
-		id = uuid.New().String()
-
+		var name, typ string
 		switch {
-		case close:
+		case shouldClose:
 			name = randomC()
+			typ = "closing"
 		case throttle:
 			name = randomT()
+			typ = "throttling"
 		default:
 			name = randomR()
-		}
-
-		typ := "regular"
-
-		if close {
-			typ = "closing"
-		}
-
-		if throttle {
-			typ = "throttling"
+			typ = "regular"
 		}
 
 		ups, err := net.DialTCP("tcp", nil, p.upstreamAddr)
@@ -223,12 +211,10 @@ func (p *Proxy) accept(ctx context.Context, ln *net.TCPListener) error {
 			})
 		}
 
-		if close {
+		if shouldClose {
 			on.ConnectionScheduledClose(id, name, p.delay)
 
-			time.AfterFunc(p.delay, func() {
-				connectionCloser()
-			})
+			time.AfterFunc(p.delay, connectionCloser)
 			continue
 		}
 
@@ -236,7 +222,18 @@ func (p *Proxy) accept(ctx context.Context, ln *net.TCPListener) error {
 			Executor(
 				ExecuteWithContext(
 					func(ctx context.Context) {
-						c := connection{config.DirUpstream, on, id, name, typ, throttle, close, p.rate, p.delay, conn, ups}
+						c := connection{
+							direction: config.DirUpstream,
+							inst:      on,
+							id:        id,
+							alias:     name,
+							typ:       typ,
+							throttle:  throttle,
+							rate:      p.rate,
+							delay:     p.delay,
+							r:         conn,
+							w:         ups,
+						}
 						c.handleConnection(ctx)
 						if p.rate != 0 {
 							c.closeSingleSide()
@@ -244,7 +241,18 @@ func (p *Proxy) accept(ctx context.Context, ln *net.TCPListener) error {
 						}
 					},
 					func(ctx context.Context) {
-						c := connection{config.DirDownstream, on, id, name, typ, throttle, close, p.rate, p.delay, ups, conn}
+						c := connection{
+							direction: config.DirDownstream,
+							inst:      on,
+							id:        id,
+							alias:     name,
+							typ:       typ,
+							throttle:  throttle,
+							rate:      p.rate,
+							delay:     p.delay,
+							r:         ups,
+							w:         conn,
+						}
 						c.handleConnection(ctx)
 						if p.rate != 0 {
 							c.closeSingleSide()
@@ -282,8 +290,7 @@ func (c *connection) calcBufSize(inThrottle bool) int {
 }
 
 func (c *connection) handleConnection(ctx context.Context) {
-	bytes := 0
-	notClosed := true
+	totalBytes := 0
 
 	t0 := time.Now()
 
@@ -292,7 +299,7 @@ func (c *connection) handleConnection(ctx context.Context) {
 	log := c.log()
 
 	if c.rate != 0 {
-		for notClosed {
+		for {
 			throttleAlready := c.throttle && (time.Since(t0) > c.delay)
 			bufSize := c.calcBufSize(throttleAlready)
 
@@ -303,31 +310,26 @@ func (c *connection) handleConnection(ctx context.Context) {
 
 			t1 := time.Now()
 			n, readErr := c.r.Read(buf)
-			if readErr == io.EOF {
+			eof := readErr == io.EOF
+			if eof {
 				log.Tracef("Read EOF")
 				readErr = nil
-				notClosed = false
 			}
 			m, writeErr := c.w.Write(buf[0:n])
-			bytes += m
+			totalBytes += m
 
 			if n != m {
 				log.WithField("undeliveredBytes", n-m).Infof("Wrote less bytes than expected")
-				notClosed = false
 			}
 			if readErr != nil {
 				log.WithError(readErr).Warnf("Read returned error")
-				notClosed = false
 			}
 			if writeErr != nil {
 				log.WithError(writeErr).Warnf("Write returned error")
-				notClosed = false
-			}
-			if ctx.Err() != nil {
-				notClosed = false
 			}
 			c.inst.ConnectionProgressed(c.id, c.alias, c.direction, m)
 
+			ctxCancelled := ctx.Err() != nil
 			if time.Since(t0) > c.delay && c.throttle && c.rate > 0 {
 				waitTime := time.Duration(1000*float64(n)/float64(c.rate)) * time.Millisecond
 				t2 := time.Since(t1)
@@ -338,12 +340,16 @@ func (c *connection) handleConnection(ctx context.Context) {
 				c.inst.ConnectionDelayed(c.id, c.alias, c.direction, waitTime)
 				select {
 				case <-ctx.Done():
-					notClosed = false
+					ctxCancelled = true
 				case <-time.After(waitTime):
 				}
 			}
+
+			if eof || n != m || readErr != nil || writeErr != nil || ctxCancelled {
+				break
+			}
 		}
-		c.inst.ConnectionCompleted(c.id, c.alias, c.direction, bytes, time.Since(t0))
+		c.inst.ConnectionCompleted(c.id, c.alias, c.direction, totalBytes, time.Since(t0))
 	}
 }
 

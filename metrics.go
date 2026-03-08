@@ -66,7 +66,7 @@ func (m *Metrics) Init(ctx context.Context, g *run.Group, adminPort int, data *a
 
 		err := server.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
-			logrus.Infof("HTTP handler closed with error: %s", err)
+			logrus.Errorf("HTTP handler closed with error: %s", err)
 		}
 		return nil
 	}, func(error) {

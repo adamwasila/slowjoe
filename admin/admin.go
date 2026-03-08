@@ -8,7 +8,6 @@ import (
 	"path"
 	"sort"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/adamwasila/slowjoe/config"
@@ -65,7 +64,10 @@ func AddRoutes(mux *goji.Mux, data *AdminData) {
 var assets embed.FS
 
 func Assets() http.HandlerFunc {
-	dataFs, _ := fs.Sub(assets, "assets/data")
+	dataFs, err := fs.Sub(assets, "assets/data")
+	if err != nil {
+		panic(err)
+	}
 	fh := http.FileServer(http.FS(dataFs))
 	return func(w http.ResponseWriter, r *http.Request) {
 		fh.ServeHTTP(w, r)
@@ -271,8 +273,8 @@ func NewAdminData() *AdminData {
 func (a *AdminData) ConnectionOpened(id, alias, typ string) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
-	atomic.AddInt32(&a.ConnectionsActive, 1)
-	atomic.AddInt32(&a.ConnectionsTotal, 1)
+	a.ConnectionsActive++
+	a.ConnectionsTotal++
 	t := time.Now()
 	a.Connections[id] = ConnData{
 		Name:    id,
@@ -314,7 +316,7 @@ func (a *AdminData) ConnectionClosed(id, alias string, d time.Duration) {
 	t1 := time.Now()
 	a.lock.Lock()
 	defer a.lock.Unlock()
-	atomic.AddInt32(&a.ConnectionsActive, -1)
+	a.ConnectionsActive--
 	conn := a.Connections[id]
 	conn.Finished = &t1
 	a.Connections[id] = conn
