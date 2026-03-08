@@ -2,7 +2,7 @@
 
 # Slow Joe
 
-[![Go Report Card](https://goreportcard.com/badge/adamwasila/slowjoe)](https://goreportcard.com/report/adamwasila/slowjoe) [![Build Status](https://github.com/adamwasila/slowjoe/actions/workflows/main.yml/badge.svg)](https://github.com/adamwasila/slowjoe/actions/workflows/main.yml) [![Coverage Status](https://coveralls.io/repos/github/adamwasila/slowjoe/badge.svg?branch=master)](https://coveralls.io/github/adamwasila/slowjoe?branch=master) ![GitHub release (latest by date)](https://img.shields.io/github/v/release/adamwasila/slowjoe) ![GitHub](https://img.shields.io/github/license/adamwasila/slowjoe)
+[![Go Report Card](https://goreportcard.com/badge/adamwasila/slowjoe)](https://goreportcard.com/report/adamwasila/slowjoe) [![Build Status](https://github.com/adamwasila/slowjoe/actions/workflows/main.yml/badge.svg)](https://github.com/adamwasila/slowjoe/actions/workflows/main.yml) [![Coverage Status](https://coveralls.io/repos/github/adamwasila/slowjoe/badge.svg?branch=main)](https://coveralls.io/github/adamwasila/slowjoe?branch=main) ![GitHub release (latest by date)](https://img.shields.io/github/v/release/adamwasila/slowjoe) ![GitHub](https://img.shields.io/github/license/adamwasila/slowjoe)
 
 Simple TCP proxy to test your services for poor network conditions.
 
@@ -77,7 +77,7 @@ Download to your `GOPATH` by typing standard `go get` command:
 go get -u github.com/adamwasila/slowjoe
 ```
 
-Alternatively, clone this repository or download latest version. There are no official, versioned releases yet so take latest commit from the master. It opts for go modules thus sources may be put outside `GOPATH` to compile just fine using regular `go build` command. If put inside `GOPATH` remember to refer to documentation of your version of go and set `GO111MODULE` variable accordingly.
+Alternatively, clone this repository or download latest version. There are no official, versioned releases yet so take latest commit from the main. It opts for go modules thus sources may be put outside `GOPATH` to compile just fine using regular `go build` command. If put inside `GOPATH` remember to refer to documentation of your version of go and set `GO111MODULE` variable accordingly.
 
 Enter repository and issue command:
 
