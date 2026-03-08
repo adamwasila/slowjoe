@@ -1,15 +1,18 @@
 {{define "BEGIN"}}
 <!DOCTYPE html>
 <html lang="us">
+
 <head>
     <title>SlowJoe</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width">
+    <link href="/bootstrap-5.3.3.min.css" rel="stylesheet">
     <link rel="stylesheet" type="text/css" href="/style.css">
     <script src="/htmx-1.9.12.js"></script>
-    <script src="/surreal-1.1.8.js"></script>    
+    <script src="/surreal-1.1.8.js"></script>
     <script src="/pollinator-0.3.2.js"></script>
 </head>
+
 <body id="body">
     <script>
         let b = me()
@@ -19,54 +22,69 @@
                 poller.stop()
             }
             if (delay > 0) {
-                poller = new Pollinator(function() {                    
-                }, { delay : delay })
-                poller.on(Event.POLL, function(val) {
+                poller = new Pollinator(function () {
+                }, { delay: delay })
+                poller.on(Event.POLL, function (val) {
                     htmx.trigger('body', 'poll')
                 })
                 poller.start()
             }
         }
     </script>
-    <div class="grid-container">
-        <header class="header">
-            <h1><a href="https://github.com/adamwasila/slowjoe">Slow Joe</a></h1>
-            <span>
-            ⟳
-            <select id="reload">
-                <option value="0">Off</option>
-                <option value="1" selected="selected">1s</option>
-                <option value="5">5s</option>
-                <option value="10">10s</option>
-                <option value="30">30s</option>
-                <option value="60">1m</option>
-                <script>
-                    let s = me()
-                    onloadAdd(()=>{
-                        startPolling(s.value * 1000)
-                    })
-                    me().on("change", ev => {                        
-                        startPolling(me(ev).value * 1000)
-                    })
-                </script>
-            </select>
-            </span>
-        </header>
+    <div class="app-shell">
         <aside class="sidenav">
-            <img class="sidenav__img" src="/logo.png"></img>
-            <ul class="sidenav__list">
-            {{range .ui.Menu}}
-            <li class="sidenav__list-item{{if .Enabled}} sidenav__list-item-selected{{end}}"><a href="/admin/{{.Name}}">{{.Label}}</a></li>
-            {{end}}
+            <div class="sidenav__brand">
+                <img class="sidenav__img" src="/logo.png"></img>
+                <h1 class="sidenav__title mb-0">Slow Joe</h1>
+            </div>
+            <ul class="sidenav__list nav nav-pills flex-column gap-2">
+                {{range .ui.Menu}}
+                <li class="sidenav__list-item{{if .Enabled}} sidenav__list-item-selected{{end}}"><a
+                        href="/admin/{{.Name}}" class="nav-link">{{.Label}}</a></li>
+                {{end}}
             </ul>
         </aside>
-{{end}}
-{{define "END"}}        
-        <footer class="footer">
-            <div>Created by <a href="https://github.com/adamwasila/">Adam Wasila</a>; licensed under an <a href="https://www.apache.org/licenses/LICENSE-2.0">Apache License, Version 2.0</a></div>
-            <div>{{.admin.Version}}</div>
-        </footer>
+        <div class="workspace">
+            <header class="header navbar navbar-expand border-bottom">
+                <div class="container-fluid px-0">
+                    <div class="d-flex align-items-center gap-2">
+                        <a class="navbar-brand fw-semibold mb-0"
+                            href="https://github.com/adamwasila/slowjoe">Dashboard</a>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <label for="reload" class="form-label text-muted small mb-0">Auto refresh</label>
+                        <select id="reload" class="form-select form-select-sm">
+                            <option value="0">Off</option>
+                            <option value="1" selected="selected">1s</option>
+                            <option value="5">5s</option>
+                            <option value="10">10s</option>
+                            <option value="30">30s</option>
+                            <option value="60">1m</option>
+                            <script>
+                                let s = me()
+                                onloadAdd(() => {
+                                    startPolling(s.value * 1000)
+                                })
+                                me().on("change", ev => {
+                                    startPolling(me(ev).value * 1000)
+                                })
+                            </script>
+                        </select>
+                    </div>
+                </div>
+            </header>
+            {{end}}
+            {{define "END"}}
+            <footer
+                class="footer d-flex flex-wrap justify-content-between align-items-center gap-2 small text-muted border-top">
+                <div>Created by <a href="https://github.com/adamwasila/">Adam Wasila</a>; licensed under an <a
+                        href="https://www.apache.org/licenses/LICENSE-2.0">Apache License, Version 2.0</a></div>
+                <div class="fw-semibold">{{.admin.Version}}</div>
+            </footer>
+        </div>
     </div>
+    <script src="/bootstrap-5.3.3.bundle.min.js"></script>
 </body>
+
 </html>
 {{end}}
