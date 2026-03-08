@@ -69,20 +69,18 @@ Finally, point your browser to <http://localhost:6000> to see current settings a
 
 ## Install
 
-Go 1.16+ should be installed on the system. Version 1.16 is the minimum required to successfully compile the current codebase.
+Go 1.26 should be installed on the system. While it should compile succesfully using older versions it is recommended to use version 1.26 or newer.
 
-Download to your `GOPATH` by typing standard `go get` command:
+Clone project repository to your machine:
 
 ```bash
-go get -u github.com/adamwasila/slowjoe
+git clone https://github.com/adamwasila/slowjoe.git
 ```
 
-Alternatively, clone this repository or download the latest version. There are no official, versioned releases yet, so take the latest commit from master. It uses Go modules, so sources may be put outside `GOPATH` and still compile just fine using the regular `go build` command. If put inside `GOPATH`, refer to the documentation for your Go version and set the `GO111MODULE` variable accordingly.
-
-Enter repository and issue command:
+To build, enter repository and run:
 
 ```bash
-go build
+go build -o slowjoe ./cmd/slowjoe
 ```
 
 ## Configuration
